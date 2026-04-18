@@ -36,7 +36,19 @@ function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [utente, setUtente] = useState(null);
-  const [vistaCorrente, setVistaCorrente] = useState('catalogo');
+  
+  // SCHERMATA INIZIALE SU "SOCIAL"
+  const [vistaCorrente, setVistaCorrente] = useState('social');
+
+  // --- STATI FUNZIONALITÀ RACCOLTE E SALVATAGGIO ---
+  const [raccolte, setRaccolte] = useState([]); 
+  const [scarpaSelezionata, setScarpaSelezionata] = useState(null); 
+  const [nomeNuovaRaccolta, setNomeNuovaRaccolta] = useState('');
+
+  // --- STATI SOCIAL MEDIA ---
+  const [posts, setPosts] = useState([]);
+  const [postInCommento, setPostInCommento] = useState(null);
+  const [commentoTesto, setCommentoTesto] = useState('');
 
   const isAdmin = utente?.email === EMAIL_ADMIN;
 
@@ -47,27 +59,148 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUtente(session?.user || null);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
-  const registrati = async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) alert("Errore: " + error.message);
-    else alert('Registrazione completata!');
+  useEffect(() => {
+    if (utente) {
+      scaricaCatalogo();
+      caricaRaccolte();
+      scaricaPosts();
+    }
+  }, [utente]);
+
+  // --- FUNZIONI SOCIAL MEDIA ---
+  const scaricaPosts = async () => {
+    const { data, error } = await supabase
+      .from('post')
+      .select(`
+        *,
+        post_likes ( user_id ),
+        post_commenti ( * )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) {
+      setPosts(data);
+    } else {
+      console.error("Errore download post:", error);
+    }
   };
 
-  const login = async (e) => {
-    e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert("Errore: " + error.message);
+  const toggleMiPiace = async (postId) => {
+    const postCorrente = posts.find(p => p.id === postId);
+    const utenteHaMessoLike = postCorrente.post_likes.some(like => like.user_id === utente.id);
+
+    if (utenteHaMessoLike) {
+      await supabase.from('post_likes').delete().match({ post_id: postId, user_id: utente.id });
+    } else {
+      await supabase.from('post_likes').insert([{ post_id: postId, user_id: utente.id }]);
+    }
+    scaricaPosts();
   };
 
-  const logout = async () => {
-    await supabase.auth.signOut();
+  const aggiungiCommento = async (postId) => {
+    if (!commentoTesto.trim()) return;
+    
+    const { error } = await supabase.from('post_commenti').insert([{
+      post_id: postId,
+      user_id: utente.id,
+      testo: commentoTesto
+    }]);
+
+    if (!error) {
+      setCommentoTesto(''); 
+      scaricaPosts(); 
+    } else {
+      alert("Errore nell'invio del commento.");
+    }
   };
 
-  // --- CRUD DATABASE ---
+  const eliminaCommento = async (commentoId) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questo commento?")) return;
+    
+    const { error } = await supabase
+      .from('post_commenti')
+      .delete()
+      .eq('id', commentoId);
+
+    if (error) {
+      alert("Errore durante l'eliminazione del commento: " + error.message);
+    } else {
+      scaricaPosts();
+    }
+  };
+
+  // --- FUNZIONI RACCOLTE ---
+  const caricaRaccolte = async () => {
+    const { data, error } = await supabase.from('raccolte_scarpe').select('*').order('nome_raccolta');
+    if (!error && data) {
+      setRaccolte(data);
+    }
+  };
+
+  const toggleScarpaInRaccolta = async (idRaccolta, scarpaObj) => {
+    const raccoltaEsistente = raccolte.find(r => r.id === idRaccolta);
+    if (!raccoltaEsistente) return;
+
+    const presente = raccoltaEsistente.scarpe.some(s => s.id === scarpaObj.id);
+    
+    const scarpeAggiornate = presente 
+      ? raccoltaEsistente.scarpe.filter(s => s.id !== scarpaObj.id) 
+      : [...raccoltaEsistente.scarpe, scarpaObj];
+
+    const { data, error } = await supabase
+      .from('raccolte_scarpe')
+      .update({ scarpe: scarpeAggiornate })
+      .eq('id', idRaccolta)
+      .select();
+
+    if (!error && data) {
+      setRaccolte(raccolte.map(r => r.id === idRaccolta ? data[0] : r));
+    } else {
+      console.error("Errore salvataggio:", error);
+    }
+  };
+
+  const creaRaccolta = async () => {
+    if (!nomeNuovaRaccolta.trim()) return;
+    
+    const { data, error } = await supabase
+      .from('raccolte_scarpe')
+      .insert([{ 
+        user_id: utente.id, 
+        nome_raccolta: nomeNuovaRaccolta, 
+        scarpe: [] 
+      }])
+      .select();
+
+    if (!error && data) {
+      setRaccolte([...raccolte, data[0]]);
+      setNomeNuovaRaccolta('');
+    } else {
+      alert("Errore nella creazione della raccolta");
+      console.error(error);
+    }
+  };
+
+  const eliminaRaccolta = async (idRaccolta) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questa raccolta?")) return;
+    
+    const { error } = await supabase
+      .from('raccolte_scarpe')
+      .delete()
+      .eq('id', idRaccolta);
+
+    if (error) {
+      alert("Errore durante l'eliminazione: " + error.message);
+    } else {
+      setRaccolte(raccolte.filter(r => r.id !== idRaccolta));
+    }
+  };
+
+  // --- CRUD DATABASE (CATALOGO) ---
   const scaricaCatalogo = async () => {
     setInCaricamento(true);
     const { data, error } = await supabase.from('scarpe').select('*').order('id', { ascending: true });
@@ -137,11 +270,18 @@ function App() {
     if (!urlImmagine) return;
 
     const { error } = await supabase.from('scarpe').update({ immagine: urlImmagine }).eq('id', idScarpa);
-    if (error) {
-      alert("Errore durante il salvataggio dell'immagine: " + error.message);
-    } else {
-      scaricaCatalogo();
-    }
+    if (error) alert("Errore durante il salvataggio dell'immagine: " + error.message);
+    else scaricaCatalogo();
+  };
+
+  const rimuoviImmagine = async (e, idScarpa) => {
+    e.stopPropagation(); 
+    if (!isAdmin) return;
+    if (!window.confirm("Sei sicuro di voler rimuovere l'immagine da questa scarpa?")) return;
+
+    const { error } = await supabase.from('scarpe').update({ immagine: null }).eq('id', idScarpa);
+    if (error) alert("Errore durante la rimozione dell'immagine: " + error.message);
+    else scaricaCatalogo();
   };
 
   const gestisciImportazioneCSV = (e) => {
@@ -173,10 +313,6 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    if (utente) scaricaCatalogo();
-  }, [utente]);
-
   const scarpeFiltrate = datiScarpe.filter((scarpa) => {
     const matchTesto = `${scarpa.brand} ${scarpa.modello}`.toLowerCase().includes(ricercaTesto.toLowerCase());
     const matchMin = filtroPrezzoMin === '' || scarpa.prezzo >= Number(filtroPrezzoMin);
@@ -189,11 +325,28 @@ function App() {
 
   const brandUnici = [...new Set(datiScarpe.map(s => s.brand).filter(Boolean))];
 
+  const registrati = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) alert("Errore: " + error.message);
+    else alert('Registrazione completata!');
+  };
+
+  const login = async (e) => {
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) alert("Errore: " + error.message);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+  };
+
   // --- SCHERMATA DI LOGIN ---
   if (!utente) {
     return (
       <div style={{ maxWidth: '400px', margin: '50px auto', padding: '30px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', fontFamily: 'sans-serif', textAlign: 'center' }}>
-        <h2>Benvenuto nel Catalogo!</h2>
+        <h2>Benvenuto!</h2>
         <form style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ padding: '10px' }} />
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ padding: '10px' }} />
@@ -217,49 +370,172 @@ function App() {
     backgroundColor: 'white'
   };
 
-  // --- RENDER DELL'APP CON I BOTTONI ESTERNI ---
+  // --- RENDER DELL'APP PRINCIPALE ---
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '20px', fontFamily: 'sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '20px', paddingBottom: '90px', fontFamily: 'sans-serif' }}>
       
-      {/* BARRA IN ALTO A DESTRA (FUORI DAI BOX) */}
-      <div style={{ display: 'flex', gap: '15px', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '20px', paddingRight: '10px', maxWidth: '1100px', margin: '0 auto 20px auto' }}>
+      {/* BARRA DI NAVIGAZIONE SUPERIORE */}
+      <div style={{ 
+        maxWidth: '900px', 
+        margin: '0 auto 20px auto', 
+        backgroundColor: 'white', 
+        padding: '15px 20px', 
+        borderRadius: '12px', 
+        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '15px'
+      }}>
         
-        {isAdmin && <span style={{ backgroundColor: '#ffc107', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>ADMIN</span>}
-        
-        <button onClick={logout} style={{ padding: '10px 20px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-          Esci
-        </button>
-        
-        <button 
-          onClick={() => setVistaCorrente('profilo')} 
-          title="Vai al tuo profilo"
-          style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#fff', border: '1px solid #ccc', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '18px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}
-        >
-          👤
-        </button>
+        {/* Sinistra: Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <h2 style={{ margin: 0, color: '#111', fontSize: '22px' }}>Sneaker(Not the chocolate bar)</h2>
+        </div>
+
+        {/* Destra: Azioni Utente (Admin, Esci, Profilo) */}
+        <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+          {isAdmin && <span style={{ backgroundColor: '#ffc107', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
+          
+          <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+            Esci
+          </button>
+          
+          <button 
+            onClick={() => setVistaCorrente('profilo')} 
+            style={{ padding: '8px 16px', borderRadius: '8px', backgroundColor: vistaCorrente === 'profilo' ? '#e9ecef' : 'transparent', color: '#111', border: '1px solid #ccc', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            Profilo
+          </button>
+        </div>
       </div>
 
-      {/* --- SCHERMATA DEL PROFILO --- */}
-      {vistaCorrente === 'profilo' && (
+      {/* --- 1. SCHERMATA SOCIAL MEDIA (FEED REALE) --- */}
+      {vistaCorrente === 'social' && (
         <div style={containerStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
-            <h1 style={{ margin: 0, fontSize: '24px' }}>Il Tuo Profilo</h1>
-            <button onClick={() => setVistaCorrente('catalogo')} style={{ padding: '8px 15px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
-              Torna al Catalogo
-            </button>
+          <div style={{ borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '20px' }}>
+            <h1 style={{ margin: 0, fontSize: '28px' }}>Il tuo Feed</h1>
+            <p style={{ margin: '5px 0 0 0', color: '#666' }}>Scopri le ultime tendenze e i post degli utenti.</p>
           </div>
           
-          <div style={{ marginTop: '40px', textAlign: 'center', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
-            <h2 style={{ margin: '10px 0' }}>Dettagli Account</h2>
-            <p style={{ fontSize: '18px', color: '#555' }}><strong>Email:</strong> {utente.email}</p>
-            <p style={{ fontSize: '18px', color: '#555' }}>
-              <strong>Ruolo:</strong> {isAdmin ? <span style={{ color: '#ffc107', fontWeight: 'bold' }}>Amministratore</span> : 'Utente Standard'}
-            </p>
-          </div>
+          {posts.length === 0 ? (
+            <p style={{ textAlign: 'center', color: '#999', marginTop: '30px' }}>Nessun post da mostrare. Aggiungine uno dal database!</p>
+          ) : (
+            posts.map(post => {
+              const haMessoMiPiace = post.post_likes.some(like => like.user_id === utente.id);
+              const numeroMiPiace = post.post_likes.length;
+              const numeroCommenti = post.post_commenti.length;
+
+              const nomeUtenteCorto = "Utente_" + post.user_id.substring(0, 5);
+
+              return (
+                <div key={post.id} style={{ padding: '20px', border: '1px solid #e0e0e0', borderRadius: '10px', marginBottom: '20px', backgroundColor: '#fafafa' }}>
+                  
+                  {/* Intestazione Utente */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                    <div 
+                      onClick={() => setVistaCorrente('profilo_utente_esempio')}
+                      style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                      {nomeUtenteCorto.charAt(7).toUpperCase()}
+                    </div>
+                    <strong 
+                      onClick={() => setVistaCorrente('profilo_utente_esempio')}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {nomeUtenteCorto}
+                    </strong>
+                  </div>
+                  
+                  {/* Testo del Post */}
+                  <p style={{ marginTop: 0 }}>{post.descrizione}</p>
+                  
+                  {/* Immagine del Post */}
+                  {post.immagine_url && (
+                    <div style={{ width: '100%', height: '300px', backgroundColor: '#e9ecef', borderRadius: '8px', overflow: 'hidden' }}>
+                      <img src={post.immagine_url} alt="Post" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  )}
+                  
+                  {/* Azioni del Post: Mi Piace e Commenti */}
+                  <div style={{ display: 'flex', gap: '25px', marginTop: '15px', color: '#555', fontWeight: 'bold' }}>
+                    <span onClick={() => toggleMiPiace(post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill={haMessoMiPiace ? "#e0245e" : "none"} stroke={haMessoMiPiace ? "#e0245e" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform 0.2s, fill 0.2s', transform: haMessoMiPiace ? 'scale(1.15)' : 'scale(1)' }}>
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                      </svg>
+                      {numeroMiPiace} Mi piace
+                    </span>
+                    
+                    <span onClick={() => setPostInCommento(postInCommento === post.id ? null : post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                      </svg>
+                      {numeroCommenti} Commenti
+                    </span>
+                  </div>
+
+                  {/* Sezione Espansa dei Commenti */}
+                  {postInCommento === post.id && (
+                    <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
+                      
+                      {/* Lista commenti esistenti */}
+                      {post.post_commenti.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
+                          {post.post_commenti.map(commento => {
+                            const puoEliminare = isAdmin || commento.user_id === utente.id;
+
+                            return (
+                              <div key={commento.id} style={{ backgroundColor: '#e9ecef', padding: '10px', borderRadius: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <strong style={{ display: 'block', marginBottom: '3px' }}>Utente_{commento.user_id.substring(0, 5)}</strong>
+                                  {commento.testo}
+                                </div>
+                                {puoEliminare && (
+                                  <button 
+                                    onClick={() => eliminaCommento(commento.id)}
+                                    style={{ backgroundColor: 'transparent', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '14px' }}
+                                    title="Elimina commento"
+                                  >
+                                    ❌
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p style={{ color: '#888', fontSize: '14px', fontStyle: 'italic' }}>Nessun commento ancora. Scrivi il primo!</p>
+                      )}
+
+                      {/* Input per nuovo commento */}
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input 
+                          type="text" 
+                          placeholder="Scrivi un commento..." 
+                          value={commentoTesto} 
+                          onChange={(e) => setCommentoTesto(e.target.value)} 
+                          style={{ flex: 1, padding: '10px', borderRadius: '20px', border: '1px solid #ccc' }}
+                        />
+                        <button 
+                          onClick={() => aggiungiCommento(post.id)} 
+                          style={{ padding: '8px 16px', backgroundColor: '#111', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+                        >
+                          Invia
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
+
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
-      {/* --- SCHERMATA DEL CATALOGO --- */}
+      {/* --- 2. SCHERMATA DEL CATALOGO SCARPE --- */}
       {vistaCorrente === 'catalogo' && (
         <div style={containerStyle}>
           
@@ -278,7 +554,7 @@ function App() {
           </datalist>
 
           <div style={{ borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
-            <h1 style={{ margin: 0, fontSize: '28px' }}>Catalogo Scarpe</h1>
+            <h1 style={{ margin: '0', fontSize: '28px' }}>Catalogo Scarpe</h1>
           </div>
 
           <div style={{ marginTop: '20px', marginBottom: '20px' }}>
@@ -344,7 +620,7 @@ function App() {
                 <div>
                   <label style={{ fontSize: '13px', color: '#555', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <input type="checkbox" checked={mantieniDati} onChange={(e) => setMantieniDati(e.target.checked)} />
-                    Mantieni i dati inseriti dopo il salvataggio (utile per caricamenti multipli)
+                    Mantieni i dati inseriti dopo il salvataggio
                   </label>
                 </div>
               </form>
@@ -359,7 +635,7 @@ function App() {
                     <input type="file" accept=".csv" onChange={gestisciImportazioneCSV} />
                   </div>
                   <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                    Il file deve avere la seguente riga di intestazione esatta: <strong>brand, modello, prezzo, colore</strong>.
+                    Intestazione richiesta: <strong>brand, modello, prezzo, colore</strong>.
                   </p>
                 </div>
               </div>
@@ -374,7 +650,10 @@ function App() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
             gap: '20px'
           }}>
-            {scarpeFiltrate.map((scarpa) => (
+            {scarpeFiltrate.map((scarpa) => {
+              const isSalvataOvunque = raccolte.some(r => r.scarpe.some(s => s.id === scarpa.id));
+
+              return (
               <li key={scarpa.id} style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', borderLeft: isAdmin ? '5px solid #ffc107' : '5px solid #17A2B8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 
                 {idInModifica === scarpa.id ? (
@@ -409,41 +688,303 @@ function App() {
                         cursor: isAdmin ? 'pointer' : 'default',
                         overflow: 'hidden',
                         flexShrink: 0,
-                        border: '1px solid #dee2e6'
+                        border: '1px solid #dee2e6',
+                        position: 'relative'
                       }}
                     >
                       {scarpa.immagine ? (
-                        <img src={scarpa.immagine} alt={scarpa.modello} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <>
+                          <img src={scarpa.immagine} alt={scarpa.modello} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => rimuoviImmagine(e, scarpa.id)}
+                              title="Rimuovi immagine"
+                              style={{ position: 'absolute', top: '5px', right: '5px', backgroundColor: 'rgba(220, 53, 69, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', fontWeight: 'bold' }}
+                            >
+                              X
+                            </button>
+                          )}
+                        </>
                       ) : (
-                        <span style={{ fontSize: '30px', color: '#adb5bd', fontWeight: 'bold' }}>+</span>
+                        isAdmin ? (
+                          <span style={{ fontSize: '30px', color: '#adb5bd', fontWeight: 'bold' }}>+</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#adb5bd' }}>
+                            <span style={{ fontSize: '30px' }}>👟</span>
+                            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Nessuna foto</span>
+                          </div>
+                        )
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                      <strong style={{ fontSize: '18px', lineHeight: '1.2', marginBottom: '5px' }}>{scarpa.brand}<br/>{scarpa.modello}</strong>
-                      <div style={{ color: '#555', fontSize: '14px', display: 'flex', flexDirection: 'column' }}>
-                        <span>Prezzo: €{scarpa.prezzo || 'N/D'}</span>
-                        <span>Colore: {scarpa.colore || 'N/D'}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                      <div>
+                        <strong style={{ fontSize: '18px', lineHeight: '1.2', marginBottom: '5px' }}>{scarpa.brand}<br/>{scarpa.modello}</strong>
+                        <div style={{ color: '#555', fontSize: '14px', display: 'flex', flexDirection: 'column', marginTop: '5px' }}>
+                          <span>Prezzo: €{scarpa.prezzo || 'N/D'}</span>
+                          <span>Colore: {scarpa.colore || 'N/D'}</span>
+                        </div>
                       </div>
                       
-                      {isAdmin && (
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '15px' }}>
-                          <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
-                          <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>
-                        </div>
-                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
+                        <button 
+                          onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)} 
+                          style={{ 
+                            padding: '6px', 
+                            backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef', 
+                            color: isSalvataOvunque ? '#000' : '#333', 
+                            border: '1px solid #ccc', 
+                            borderRadius: '4px', 
+                            cursor: 'pointer', 
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
+                        </button>
+
+                        {/* MENU SCELTA RACCOLTE INLINE */}
+                        {scarpaSelezionata === scarpa.id && (
+                          <div style={{ padding: '10px', backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <strong style={{ fontSize: '12px' }}>Salva in:</strong>
+                            
+                            {raccolte.map(raccolta => (
+                              <label key={raccolta.id} style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={raccolta.scarpe.some(s => s.id === scarpa.id)} 
+                                  onChange={() => toggleScarpaInRaccolta(raccolta.id, scarpa)} 
+                                />
+                                {raccolta.nome_raccolta}
+                              </label>
+                            ))}
+
+                            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                              <input 
+                                type="text" 
+                                placeholder="Nuova raccolta..." 
+                                value={nomeNuovaRaccolta} 
+                                onChange={(e) => setNomeNuovaRaccolta(e.target.value)} 
+                                style={{ flex: 1, padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '3px' }}
+                              />
+                              <button onClick={creaRaccolta} style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#111', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Crea</button>
+                            </div>
+                          </div>
+                        )}
+
+                        {isAdmin && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
+                            <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
               </li>
-            ))}
+              );
+            })}
             
           </ul>
           {scarpeFiltrate.length === 0 && !inCaricamento && (
-            <p style={{ color: 'gray', textAlign: 'center', fontStyle: 'italic', marginTop: '30px' }}>Nessuna scarpa trovata con questi filtri.</p>
+            <p style={{ color: 'gray', textAlign: 'center', fontStyle: 'italic', marginTop: '30px' }}>Nessuna scarpa trovata.</p>
           )}
         </div>
       )}
+
+      {/* --- 3. SCHERMATA DEL PROFILO --- */}
+      {vistaCorrente === 'profilo' && (
+        <div style={containerStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+            <h1 style={{ margin: 0, fontSize: '24px' }}>Il Tuo Profilo</h1>
+          </div>
+          
+          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee' }}>
+            <h2 style={{ margin: '0 0 15px 0', fontSize: '20px' }}>Dettagli Account</h2>
+            <p style={{ fontSize: '16px', color: '#555', margin: '5px 0' }}><strong>Email:</strong> {utente.email}</p>
+            <p style={{ fontSize: '16px', color: '#555', margin: '5px 0' }}>
+              <strong>Ruolo:</strong> {isAdmin ? <span style={{ color: '#ff8c00', fontWeight: 'bold' }}>Amministratore</span> : 'Utente Standard'}
+            </p>
+          </div>
+
+          <div style={{ marginTop: '40px' }}>
+            <h2 style={{ fontSize: '22px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>Le Tue Raccolte</h2>
+            
+            {raccolte.length === 0 ? (
+              <p style={{ color: '#777', fontStyle: 'italic', marginTop: '20px' }}>Non hai ancora creato nessuna raccolta.</p>
+            ) : (
+              <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                {raccolte.map((raccolta) => {
+                  const scarpeNellaRaccolta = raccolta.scarpe;
+                  
+                  return (
+                    <div key={raccolta.id} style={{ padding: '15px', border: '1px solid #e0e0e0', borderRadius: '8px', backgroundColor: '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px', marginBottom: '15px' }}>
+                        <h3 style={{ margin: 0, color: '#111', fontSize: '18px' }}>
+                          📁 {raccolta.nome_raccolta} <span style={{ fontSize: '14px', color: '#888', fontWeight: 'normal' }}>({scarpeNellaRaccolta.length} scarpe)</span>
+                        </h3>
+                        <button 
+                          onClick={() => eliminaRaccolta(raccolta.id)} 
+                          title="Elimina raccolta" 
+                          style={{ backgroundColor: '#ffeeba', color: '#dc3545', border: 'none', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                        >
+                          ❌ Elimina
+                        </button>
+                      </div>
+                      
+                      {scarpeNellaRaccolta.length === 0 ? (
+                        <p style={{ color: '#aaa', fontStyle: 'italic', margin: 0 }}>Nessuna scarpa salvata in questa raccolta.</p>
+                      ) : (
+                        <ul style={{ 
+                          listStyleType: 'none', 
+                          padding: 0, 
+                          margin: 0,
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                          gap: '15px'
+                        }}>
+                          {scarpeNellaRaccolta.map((scarpa) => (
+                            <li key={scarpa.id} style={{ display: 'flex', flexDirection: 'column', border: '1px solid #eee', borderRadius: '6px', overflow: 'hidden' }}>
+                              <div style={{ height: '120px', backgroundColor: '#f8f9fa', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                {scarpa.immagine ? (
+                                  <img src={scarpa.immagine} alt={scarpa.modello} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#ccc' }}>
+                                    <span style={{ fontSize: '24px' }}>👟</span>
+                                    <span style={{ fontSize: '10px', fontWeight: 'bold' }}>Nessuna foto</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ padding: '10px', backgroundColor: '#fff' }}>
+                                <strong style={{ display: 'block', fontSize: '13px' }}>{scarpa.brand}</strong>
+                                <span style={{ display: 'block', fontSize: '12px', color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{scarpa.modello}</span>
+                                <strong style={{ display: 'block', fontSize: '13px', color: '#28A745', marginTop: '5px' }}>€{scarpa.prezzo}</strong>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* --- 4. SCHERMATA PROFILO ALTRO UTENTE --- */}
+      {vistaCorrente === 'profilo_utente_esempio' && (
+        <div style={containerStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+            <h1 style={{ margin: 0, fontSize: '24px' }}>Profilo Utente</h1>
+            <button onClick={() => setVistaCorrente('social')} style={{ padding: '6px 12px', backgroundColor: '#e9ecef', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Torna Indietro</button>
+          </div>
+          
+          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #eee', display: 'flex', alignItems: 'center', gap: '20px' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '24px', fontWeight: 'bold', border: '2px solid #ddd' }}>
+              U
+            </div>
+            <div>
+              <h2 style={{ margin: '0 0 10px 0', fontSize: '20px' }}>Utente di Esempio</h2>
+              <p style={{ fontSize: '16px', color: '#555', margin: '5px 0' }}><strong>Ruolo:</strong> Collezionista</p>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '40px', textAlign: 'center', color: '#888', fontStyle: 'italic', padding: '40px 0', backgroundColor: '#fafafa', borderRadius: '8px', border: '1px dashed #ddd' }}>
+            Questo utente non ha ancora reso pubbliche le sue raccolte.
+          </div>
+        </div>
+      )}
+
+      {/* BOTTOM NAVIGATION BAR */}
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderTop: '1px solid #eaeaea',
+        display: 'grid',
+        gridTemplateColumns: '1fr auto 1fr',
+        alignItems: 'center',
+        justifyItems: 'center',
+        padding: '10px 20px',
+        boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
+        zIndex: 1000
+      }}>
+        
+        {/* Bottone Home/Feed (Sinistra) */}
+        <button 
+          onClick={() => setVistaCorrente('social')}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            cursor: 'pointer', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            color: vistaCorrente === 'social' ? '#111' : '#aaa'
+          }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'social' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'social' ? 'bold' : 'normal' }}>Feed</span>
+        </button>
+
+        {/* Bottone Centrale "+" (Crea Post) */}
+        <button 
+          onClick={() => alert("Funzionalità Creazione Post in arrivo!")}
+          style={{
+            backgroundColor: '#111',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '56px',
+            height: '56px',
+            fontSize: '32px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+            transform: 'translateY(-15px)' 
+          }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+
+        {/* Bottone Catalogo (Destra) */}
+        <button 
+          onClick={() => setVistaCorrente('catalogo')}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            cursor: 'pointer', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center',
+            color: vistaCorrente === 'catalogo' ? '#111' : '#aaa'
+          }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'catalogo' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'catalogo' ? 'bold' : 'normal' }}>Catalogo</span>
+        </button>
+
+      </div>
+
     </div>
   );
 }
