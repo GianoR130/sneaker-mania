@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Papa from 'papaparse';
+import CreaPost from './CreaPost';
 
 
-function App() {
+function MainApp() {
   // --- IMPOSTAZIONI ADMIN ---
   const EMAIL_ADMIN = 'admin@email.com';
 
@@ -204,6 +205,19 @@ function App() {
       await supabase.from('post_likes').insert([{ post_id: postId, user_id: utente.id }]);
     }
     scaricaPosts();
+  };
+
+  const eliminaPost = async (postId) => {
+    if (!window.confirm("Sei sicuro di voler eliminare questo post?")) return;
+
+    const { error } = await supabase.from('post').delete().eq('id', postId);
+    
+    if (!error) {
+      // Rimuoviamo il post dalla schermata in tempo reale
+      setPosts(posts.filter(p => p.id !== postId));
+    } else {
+      alert("Errore durante l'eliminazione: " + error.message);
+    }
   };
 
 
@@ -559,7 +573,17 @@ function App() {
    
         </div>
       </div>
-
+      
+      {/* SCHERMATA CREA POST*/}
+        {vistaCorrente === 'crea_post' && (
+          <CreaPost 
+            utente={utente} 
+            tornaAlFeed={() => {
+              setVistaCorrente('social');
+              scaricaPosts(); // Ricarichiamo i post così il nuovo appare subito!
+            }} 
+          />
+        )}
 
       {/* --- 1. SCHERMATA SOCIAL MEDIA (FEED REALE) --- */}
       {vistaCorrente === 'social' && (
@@ -568,7 +592,7 @@ function App() {
             <h1 style={{ margin: 0, fontSize: '28px' }}>Il tuo Feed</h1>
             <p style={{ margin: '5px 0 0 0', color: '#666' }}>Scopri le ultime tendenze e i post degli utenti.</p>
           </div>
-         
+          
           {posts.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#999', marginTop: '30px' }}>Nessun post da mostrare. Aggiungine uno dal database!</p>
           ) : (
@@ -577,13 +601,11 @@ function App() {
               const numeroMiPiace = post.post_likes.length;
               const numeroCommenti = post.post_commenti.length;
 
-
               const nomeUtenteCorto = "Utente_" + post.user_id.substring(0, 5);
-
 
               return (
                 <div key={post.id} style={{ padding: '20px', border: '1px solid #e0e0e0', borderRadius: '10px', marginBottom: '20px', backgroundColor: '#fafafa' }}>
-                 
+                  
                   {/* Intestazione Utente */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                     <div
@@ -598,18 +620,44 @@ function App() {
                     >
                       {nomeUtenteCorto}
                     </strong>
+
+                    {/* --- TASTO ELIMINA POST AGGIUNTO QUI --- */}
+                    {(isAdmin || post.user_id === utente.id) && (
+                      <button 
+                        onClick={() => eliminaPost(post.id)}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', padding: '5px' }}
+                        title="Elimina post"
+                      >
+                        ❌
+                      </button>
+                    )}
+                    {/* -------------------------------------- */}
                   </div>
-                 
+                  
                   {/* Testo del Post */}
-                  <p style={{ marginTop: 0 }}>{post.descrizione}</p>
-                 
+                  <p style={{ marginTop: 0, marginBottom: post.hashtags ? '5px' : '15px', fontSize: '16px' }}>
+                    {post.descrizione}
+                  </p>
+                  
+                  {/* --- NUOVO: MOSTRA GLI HASHTAG SE CI SONO --- */}
+                  {post.hashtags && (
+                    <p style={{ color: '#007BFF', margin: '0 0 15px 0', fontSize: '15px', fontWeight: '500' }}>
+                      {post.hashtags}
+                    </p>
+                  )}
+                  {/* ------------------------------------------- */}
+                  
                   {/* Immagine del Post */}
                   {post.immagine_url && (
-                    <div style={{ width: '100%', height: '300px', backgroundColor: '#e9ecef', borderRadius: '8px', overflow: 'hidden' }}>
-                      <img src={post.immagine_url} alt="Post" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ width: '100%', marginBottom: '15px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#f0f0f0', display: 'flex', justifyContent: 'center' }}>
+                      <img 
+                        src={post.immagine_url} 
+                        alt="Post" 
+                        style={{ maxWidth: '100%', maxHeight: '550px', objectFit: 'contain' }} 
+                      />
                     </div>
                   )}
-                 
+                  
                   {/* Azioni del Post: Mi Piace e Commenti */}
                   <div style={{ display: 'flex', gap: '25px', marginTop: '15px', color: '#555', fontWeight: 'bold' }}>
                     <span onClick={() => toggleMiPiace(post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -618,7 +666,7 @@ function App() {
                       </svg>
                       {numeroMiPiace} Mi piace
                     </span>
-                   
+                    
                     <span onClick={() => setPostInCommento(postInCommento === post.id ? null : post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
@@ -627,18 +675,16 @@ function App() {
                     </span>
                   </div>
 
-
                   {/* Sezione Espansa dei Commenti */}
                   {postInCommento === post.id && (
                     <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
-                     
+                      
                       {/* Lista commenti esistenti */}
                       {post.post_commenti.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
                           {post.post_commenti.map(commento => {
                             const puoEliminare = isAdmin || commento.user_id === utente.id;
                             const nomeCommentatore = "Utente_" + commento.user_id.substring(0, 5);
-
 
                             return (
                               <div key={commento.id} style={{ backgroundColor: '#e9ecef', padding: '10px', borderRadius: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -668,7 +714,6 @@ function App() {
                         <p style={{ color: '#888', fontSize: '14px', fontStyle: 'italic' }}>Nessun commento ancora. Scrivi il primo!</p>
                       )}
 
-
                       {/* Input per nuovo commento */}
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <input
@@ -686,10 +731,8 @@ function App() {
                         </button>
                       </div>
 
-
                     </div>
                   )}
-
 
                 </div>
               );
@@ -1187,7 +1230,7 @@ function App() {
 
         {/* 3. Bottone Centrale "+" (Creazione Post) */}
         <button
-          onClick={() => alert("Funzionalità Creazione Post in arrivo!")}
+          onClick={() => setVistaCorrente('crea_post')}
           style={{ backgroundColor: '#111', color: 'white', border: 'none', borderRadius: '50%', width: '50px', height: '50px', fontSize: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transform: 'translateY(-15px)' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1233,7 +1276,7 @@ function App() {
 }
 
 
-export default App;
+export default MainApp;
 
 
 
