@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Papa from 'papaparse';
 import CreaPost from './CreaPost';
+import Esplora from './Esplora';
 
 
 function MainApp() {
   // --- IMPOSTAZIONI ADMIN ---
   const EMAIL_ADMIN = 'admin@email.com';
 
-
-  // --- STATI DATABASE E FORM ---
+  // STATO RICERCA
+  const [queryRicerca, setQueryRicerca] = useState("");
+  // STATI DATABASE E FORM
   const [datiScarpe, setDatiScarpe] = useState([]);
   const [inCaricamento, setInCaricamento] = useState(false);
  
@@ -162,11 +164,16 @@ function MainApp() {
 
 
   // Funzione per aprire i profili
-  const apriProfiloUtente = (userId, nomeUtente) => {
+  const apriProfiloUtente = (userId, nomeUtente, emailUtente) => {
     if (userId === utente.id) {
       setVistaCorrente('profilo');
     } else {
-      setProfiloSelezionato({ id: userId, username: nomeUtente || "Utente" });
+      // Ora salviamo anche l'email nel profilo selezionato!
+      setProfiloSelezionato({ 
+        id: userId, 
+        username: nomeUtente || "Utente",
+        email: emailUtente 
+      });
       setVistaCorrente('profilo_altro_utente');
       caricaRelazioniProfilo(userId);
     }
@@ -181,7 +188,8 @@ function MainApp() {
       .select(`
         *,
         post_likes ( user_id ),
-        post_commenti ( * )
+        post_commenti ( * ),
+        profili ( email, username )
       `)
       .order('created_at', { ascending: false });
 
@@ -218,6 +226,11 @@ function MainApp() {
     } else {
       alert("Errore durante l'eliminazione: " + error.message);
     }
+  };
+
+  const gestisciClickHashtag = (tag) => {
+  setQueryRicerca(tag); // Salva l'hashtag (es. "#musica")
+  setVistaCorrente('cerca'); // Cambia pagina
   };
 
 
@@ -601,7 +614,8 @@ function MainApp() {
               const numeroMiPiace = post.post_likes.length;
               const numeroCommenti = post.post_commenti.length;
 
-              const nomeUtenteCorto = "Utente_" + post.user_id.substring(0, 5);
+              const emailAutore = post.profili?.email || "utente@anonimo.it";
+              const nomeUtenteCorto = emailAutore.split('@')[0];
 
               return (
                 <div key={post.id} style={{ padding: '20px', border: '1px solid #e0e0e0', borderRadius: '10px', marginBottom: '20px', backgroundColor: '#fafafa' }}>
@@ -609,19 +623,18 @@ function MainApp() {
                   {/* Intestazione Utente */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                     <div
-                      onClick={() => apriProfiloUtente(post.user_id)}
+                      onClick={() => apriProfiloUtente(post.user_id, nomeUtenteCorto, emailAutore)}
                       style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer' }}
                     >
-                      {nomeUtenteCorto.charAt(7).toUpperCase()}
+                      {nomeUtenteCorto.charAt(0).toUpperCase()} 
                     </div>
                     <strong
-                      onClick={() => apriProfiloUtente(post.user_id)}
+                      onClick={() => apriProfiloUtente(post.user_id, nomeUtenteCorto, emailAutore)}
                       style={{ cursor: 'pointer' }}
                     >
                       {nomeUtenteCorto}
                     </strong>
 
-                    {/* --- TASTO ELIMINA POST AGGIUNTO QUI --- */}
                     {(isAdmin || post.user_id === utente.id) && (
                       <button 
                         onClick={() => eliminaPost(post.id)}
@@ -631,7 +644,6 @@ function MainApp() {
                         ❌
                       </button>
                     )}
-                    {/* -------------------------------------- */}
                   </div>
                   
                   {/* Testo del Post */}
@@ -639,13 +651,20 @@ function MainApp() {
                     {post.descrizione}
                   </p>
                   
-                  {/* --- NUOVO: MOSTRA GLI HASHTAG SE CI SONO --- */}
+                  {/* --- HASHTAG ORA CLICCABILI (Layout Originale) --- */}
                   {post.hashtags && (
                     <p style={{ color: '#007BFF', margin: '0 0 15px 0', fontSize: '15px', fontWeight: '500' }}>
-                      {post.hashtags}
+                      {post.hashtags.split(" ").map((tag, index) => (
+                        <span 
+                          key={index}
+                          onClick={() => gestisciClickHashtag(tag)}
+                          style={{ cursor: 'pointer', marginRight: '5px' }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
                     </p>
                   )}
-                  {/* ------------------------------------------- */}
                   
                   {/* Immagine del Post */}
                   {post.immagine_url && (
@@ -678,8 +697,6 @@ function MainApp() {
                   {/* Sezione Espansa dei Commenti */}
                   {postInCommento === post.id && (
                     <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
-                      
-                      {/* Lista commenti esistenti */}
                       {post.post_commenti.length > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
                           {post.post_commenti.map(commento => {
@@ -690,7 +707,7 @@ function MainApp() {
                               <div key={commento.id} style={{ backgroundColor: '#e9ecef', padding: '10px', borderRadius: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                   <strong
-                                    onClick={() => apriProfiloUtente(commento.user_id)}
+                                    onClick={() => apriProfiloUtente(commento.user_id, nomeCommentatore, "")}
                                     style={{ display: 'block', marginBottom: '3px', cursor: 'pointer', color: '#007BFF' }}
                                   >
                                     {nomeCommentatore}
@@ -714,7 +731,6 @@ function MainApp() {
                         <p style={{ color: '#888', fontSize: '14px', fontStyle: 'italic' }}>Nessun commento ancora. Scrivi il primo!</p>
                       )}
 
-                      {/* Input per nuovo commento */}
                       <div style={{ display: 'flex', gap: '10px' }}>
                         <input
                           type="text"
@@ -741,6 +757,14 @@ function MainApp() {
         </div>
       )}
 
+      {/* 2. VISTA CERCA (QUESTO È IL CODICE D) */}
+      {vistaCorrente === 'cerca' && (
+        <Esplora 
+          queryIniziale={queryRicerca} 
+          utente={utente}
+          alClickProfilo={apriProfiloUtente}
+        />
+      )}
 
       {/* --- 2. SCHERMATA DEL CATALOGO SCARPE --- */}
       {vistaCorrente === 'catalogo' && (
@@ -1019,9 +1043,20 @@ function MainApp() {
             
             <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
               <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#28A745', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
-                {(mioProfilo?.username || "U").charAt(0).toUpperCase()}
+                {/* Prende l'iniziale dall'email per sicurezza */}
+                {(utente?.email || mioProfilo?.username || "U").charAt(0).toUpperCase()}
               </div>
-              <h2 style={{ margin: '0 0 5px 0' }}>@{mioProfilo?.username || "Utente"}</h2>
+              
+              {/* Mostra il nome utente oppure, se non c'è, la prima parte dell'email */}
+              <h2 style={{ margin: '0 0 5px 0' }}>
+                @{mioProfilo?.username || utente?.email?.split('@')[0] || "Utente"}
+              </h2>
+              
+              {/* --- NUOVO: MOSTRA L'EMAIL COMPLETA QUI SOTTO --- */}
+              <p style={{ color: '#666', margin: '0 0 20px 0', fontSize: '15px' }}>
+                {utente?.email}
+              </p>
+              {/* ---------------------------------------------- */}
               
               {/* I TUOI FOLLOWER E SEGUITI */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
@@ -1141,25 +1176,32 @@ function MainApp() {
             )}
           </div>
 
-
           <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            {/* Immagine Profilo (Iniziale dell'utente) */}
+            
+            {/* Immagine Profilo (Prende l'iniziale dall'email per sicurezza) */}
             <div style={{
               width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white',
               display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto'
             }}>
-               {profiloSelezionato.username ? profiloSelezionato.username.charAt(0).toUpperCase() : '?'}
+               {(profiloSelezionato.email || profiloSelezionato.username || "U").charAt(0).toUpperCase()}
             </div>
 
-
-            <h2 style={{ margin: '0' }}>@{profiloSelezionato.username || 'Utente'}</h2>
-           
-            {/* DOVE APPAIONO FOLLOWER E SEGUITI: Sotto il nome utente */}
+            {/* Nome Utente: Taglia l'email alla @ se manca lo username */}
+            <h2 style={{ margin: '0 0 5px 0' }}>
+              @{profiloSelezionato.username || profiloSelezionato.email?.split('@')[0] || 'Utente'}
+            </h2>
+            
+            {/* --- NUOVO: MOSTRA L'EMAIL COMPLETA QUI SOTTO --- */}
+            <p style={{ color: '#666', margin: '0 0 15px 0', fontSize: '15px' }}>
+              {profiloSelezionato.email}
+            </p>
+            {/* ---------------------------------------------- */}
+            
+            {/* DOVE APPAIONO FOLLOWER E SEGUITI: Sotto il nome utente e l'email */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', margin: '15px 0', color: '#666' }}>
               <span><strong>{seguitiInfo?.followers || 0}</strong> Follower</span>
               <span><strong>{seguitiInfo?.following || 0}</strong> Seguiti</span>
             </div>
-
 
             {/* Pulsante Segui / Smetti di seguire */}
               <button 
@@ -1178,7 +1220,6 @@ function MainApp() {
                 {seguitiInfo?.isFollowing ? 'Smetti di seguire' : 'Segui'}
               </button>
           </div>
-
 
           <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
              <p style={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>Le raccolte di questo utente sono private.</p>
@@ -1242,14 +1283,33 @@ function MainApp() {
 
         {/* 4. Bottone Ricerca (A destra del +) */}
         <button
-          onClick={() => alert("Ricerca utenti, hashtag e tendenze in arrivo!")}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#aaa' }}
+          onClick={() => {
+            setQueryRicerca(""); // Azzera vecchie ricerche
+            setVistaCorrente('cerca'); // Apre la nuova pagina Esplora
+          }}
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            cursor: 'pointer', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            // Diventa scuro se sei nella pagina Cerca, altrimenti resta grigio
+            color: vistaCorrente === 'cerca' ? '#111' : '#aaa' 
+          }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: 'normal' }}>Cerca</span>
+          <span style={{ 
+            fontSize: '10px', 
+            marginTop: '4px', 
+            // Diventa in grassetto se sei nella pagina Cerca
+            fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal' 
+          }}>
+            Cerca
+          </span>
         </button>
 
 
@@ -1277,6 +1337,3 @@ function MainApp() {
 
 
 export default MainApp;
-
-
-
