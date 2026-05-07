@@ -14,14 +14,14 @@ function MainApp() {
   // STATI DATABASE E FORM
   const [datiScarpe, setDatiScarpe] = useState([]);
   const [inCaricamento, setInCaricamento] = useState(false);
- 
+
   // Stati per la Creazione
   const [nuovoBrand, setNuovoBrand] = useState('');
   const [nuovoModello, setNuovoModello] = useState('');
   const [nuovoPrezzo, setNuovoPrezzo] = useState('');
   const [nuovoColore, setNuovoColore] = useState('');
   const [mantieniDati, setMantieniDati] = useState(false);
- 
+
   // Stati per la Modifica
   const [idInModifica, setIdInModifica] = useState(null);
   const [brandModificato, setBrandModificato] = useState('');
@@ -43,7 +43,7 @@ function MainApp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [utente, setUtente] = useState(null);
- 
+
   const [vistaCorrente, setVistaCorrente] = useState('social');
 
 
@@ -57,19 +57,23 @@ function MainApp() {
   const [posts, setPosts] = useState([]);
   const [postInCommento, setPostInCommento] = useState(null);
   const [commentoTesto, setCommentoTesto] = useState('');
- 
+
   // --- STATI PER I PROFILI E FOLLOWER ---
   const [profiloSelezionato, setProfiloSelezionato] = useState({ id: null, username: '' }); // MAI null!
   const [seguitiInfo, setSeguitiInfo] = useState({ followers: 0, following: 0, isFollowing: false, isFriend: false });
   const [mieRelazioni, setMieRelazioni] = useState({ followers: 0, following: 0 }); // Contatori per IL TUO profilo
   const [mioProfilo, setMioProfilo] = useState(null);
-  
+
+  // Stati per il following
+  const [miSegue, setMiSegue] = useState(false);
+  const [loSeguo, setLoSeguo] = useState(false); // Probabilmente questo lo hai già
+
 
 
   const isAdmin = utente?.email === EMAIL_ADMIN;
 
 
- 
+
 
 
   useEffect(() => {
@@ -85,6 +89,8 @@ function MainApp() {
   }, []);
 
 
+
+
   useEffect(() => {
     if (utente) {
       scaricaCatalogo();
@@ -93,6 +99,8 @@ function MainApp() {
       caricaMioProfilo(utente.id);
     }
   }, [utente]);
+
+
 
 
   // Carica i dati del TUO profilo personale
@@ -141,21 +149,21 @@ function MainApp() {
           .delete()
           .eq('follower_id', utente.id)
           .eq('following_id', targetUserId);
-          
+
         if (error) throw error;
       } else {
         // Se NON lo seguiamo, AGGIUNGIAMO il follow
         const { error } = await supabase
           .from('seguiti')
           .insert([{ follower_id: utente.id, following_id: targetUserId }]);
-          
+
         if (error) throw error;
       }
 
       // 2. Dopo aver aggiornato il DB, RICARICHIAMO i dati per aggiornare l'interfaccia
-      await caricaRelazioniProfilo(targetUserId); 
+      await caricaRelazioniProfilo(targetUserId);
       await caricaMioProfilo(utente.id);
-      
+
     } catch (error) {
       console.error("Errore nel toggle segui:", error.message);
       alert("Si è verificato un errore: " + error.message);
@@ -169,16 +177,16 @@ function MainApp() {
       setVistaCorrente('profilo');
     } else {
       // Ora salviamo anche l'email nel profilo selezionato!
-      setProfiloSelezionato({ 
-        id: userId, 
+      setProfiloSelezionato({
+        id: userId,
         username: nomeUtente || "Utente",
-        email: emailUtente 
+        email: emailUtente
       });
       setVistaCorrente('profilo_altro_utente');
       caricaRelazioniProfilo(userId);
     }
   };
- 
+
 
 
   // --- FUNZIONI SOCIAL MEDIA ---
@@ -188,7 +196,7 @@ function MainApp() {
       .select(`
         *,
         post_likes ( user_id ),
-        post_commenti ( * ),
+        post_commenti ( *, profili ( email, username ) ),
         profili ( email, username )
       `)
       .order('created_at', { ascending: false });
@@ -219,7 +227,7 @@ function MainApp() {
     if (!window.confirm("Sei sicuro di voler eliminare questo post?")) return;
 
     const { error } = await supabase.from('post').delete().eq('id', postId);
-    
+
     if (!error) {
       // Rimuoviamo il post dalla schermata in tempo reale
       setPosts(posts.filter(p => p.id !== postId));
@@ -229,14 +237,14 @@ function MainApp() {
   };
 
   const gestisciClickHashtag = (tag) => {
-  setQueryRicerca(tag); // Salva l'hashtag (es. "#musica")
-  setVistaCorrente('cerca'); // Cambia pagina
+    setQueryRicerca(tag); // Salva l'hashtag (es. "#musica")
+    setVistaCorrente('cerca'); // Cambia pagina
   };
 
 
   const aggiungiCommento = async (postId) => {
     if (!commentoTesto.trim()) return;
-   
+
     const { error } = await supabase.from('post_commenti').insert([{
       post_id: postId,
       user_id: utente.id,
@@ -255,7 +263,7 @@ function MainApp() {
 
   const eliminaCommento = async (commentoId) => {
     if (!window.confirm("Sei sicuro di voler eliminare questo commento?")) return;
-   
+
     const { error } = await supabase
       .from('post_commenti')
       .delete()
@@ -273,18 +281,18 @@ function MainApp() {
 
 
   const caricaRaccolte = async () => {
-  // Aggiungiamo .select('*, scarpe(*)') per tirare fuori tutti i dettagli delle scarpe
-  const { data, error } = await supabase
-    .from('raccolte_scarpe')
-    .select('*, scarpe(*)') 
-    .order('nome_raccolta');
+    // Aggiungiamo .select('*, scarpe(*)') per tirare fuori tutti i dettagli delle scarpe
+    const { data, error } = await supabase
+      .from('raccolte_scarpe')
+      .select('*, scarpe(*)')
+      .order('nome_raccolta');
 
-  if (!error && data) {
-    setRaccolte(data);
-  } else {
-    console.error("Errore nel caricamento raccolte:", error);
-  }
-};
+    if (!error && data) {
+      setRaccolte(data);
+    } else {
+      console.error("Errore nel caricamento raccolte:", error);
+    }
+  };
 
 
   const toggleScarpaInRaccolta = async (idRaccolta, scarpaObj) => {
@@ -293,7 +301,7 @@ function MainApp() {
 
 
     const presente = raccoltaEsistente.scarpe.some(s => s.id === scarpaObj.id);
-   
+
     const scarpeAggiornate = presente
       ? raccoltaEsistente.scarpe.filter(s => s.id !== scarpaObj.id)
       : [...raccoltaEsistente.scarpe, scarpaObj];
@@ -316,7 +324,7 @@ function MainApp() {
 
   const creaRaccolta = async () => {
     if (!nomeNuovaRaccolta.trim()) return;
-   
+
     const { data, error } = await supabase
       .from('raccolte_scarpe')
       .insert([{
@@ -344,7 +352,7 @@ function MainApp() {
 
     // 2. Cancella la raccolta dal database Supabase
     const { error } = await supabase.from('raccolte_scarpe').delete().eq('id', idRaccolta);
-    
+
     // 3. Se non ci sono stati errori, la fa scomparire istantaneamente dallo schermo
     if (!error) {
       setRaccolte(raccolte.filter(r => r.id !== idRaccolta));
@@ -482,7 +490,7 @@ function MainApp() {
     });
   };
 
-  
+
 
 
   const scarpeFiltrate = datiScarpe.filter((scarpa) => {
@@ -553,7 +561,7 @@ function MainApp() {
   // --- RENDER DELL'APP PRINCIPALE ---
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', padding: '20px', paddingBottom: '90px', fontFamily: 'sans-serif' }}>
-     
+
       {/* BARRA DI NAVIGAZIONE SUPERIORE */}
       <div style={{
         maxWidth: '900px',
@@ -568,7 +576,7 @@ function MainApp() {
         flexWrap: 'wrap',
         gap: '15px'
       }}>
-       
+
         {/* Sinistra: Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <h2 style={{ margin: 0, color: '#111', fontSize: '22px' }}>Sneaker(Not the chocolate bar)</h2>
@@ -578,25 +586,25 @@ function MainApp() {
         {/* Destra: Azioni Utente (Admin, Esci, Profilo) */}
         <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
           {isAdmin && <span style={{ backgroundColor: '#ffc107', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
-         
+
           <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
             Esci
           </button>
-         
-   
+
+
         </div>
       </div>
-      
+
       {/* SCHERMATA CREA POST*/}
-        {vistaCorrente === 'crea_post' && (
-          <CreaPost 
-            utente={utente} 
-            tornaAlFeed={() => {
-              setVistaCorrente('social');
-              scaricaPosts(); // Ricarichiamo i post così il nuovo appare subito!
-            }} 
-          />
-        )}
+      {vistaCorrente === 'crea_post' && (
+        <CreaPost
+          utente={utente}
+          tornaAlFeed={() => {
+            setVistaCorrente('social');
+            scaricaPosts(); // Ricarichiamo i post così il nuovo appare subito!
+          }}
+        />
+      )}
 
       {/* --- 1. SCHERMATA SOCIAL MEDIA (FEED REALE) --- */}
       {vistaCorrente === 'social' && (
@@ -605,7 +613,7 @@ function MainApp() {
             <h1 style={{ margin: 0, fontSize: '28px' }}>Il tuo Feed</h1>
             <p style={{ margin: '5px 0 0 0', color: '#666' }}>Scopri le ultime tendenze e i post degli utenti.</p>
           </div>
-          
+
           {posts.length === 0 ? (
             <p style={{ textAlign: 'center', color: '#999', marginTop: '30px' }}>Nessun post da mostrare. Aggiungine uno dal database!</p>
           ) : (
@@ -619,14 +627,14 @@ function MainApp() {
 
               return (
                 <div key={post.id} style={{ padding: '20px', border: '1px solid #e0e0e0', borderRadius: '10px', marginBottom: '20px', backgroundColor: '#fafafa' }}>
-                  
+
                   {/* Intestazione Utente */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                     <div
                       onClick={() => apriProfiloUtente(post.user_id, nomeUtenteCorto, emailAutore)}
                       style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer' }}
                     >
-                      {nomeUtenteCorto.charAt(0).toUpperCase()} 
+                      {nomeUtenteCorto.charAt(0).toUpperCase()}
                     </div>
                     <strong
                       onClick={() => apriProfiloUtente(post.user_id, nomeUtenteCorto, emailAutore)}
@@ -636,7 +644,7 @@ function MainApp() {
                     </strong>
 
                     {(isAdmin || post.user_id === utente.id) && (
-                      <button 
+                      <button
                         onClick={() => eliminaPost(post.id)}
                         style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', padding: '5px' }}
                         title="Elimina post"
@@ -645,17 +653,17 @@ function MainApp() {
                       </button>
                     )}
                   </div>
-                  
+
                   {/* Testo del Post */}
                   <p style={{ marginTop: 0, marginBottom: post.hashtags ? '5px' : '15px', fontSize: '16px' }}>
                     {post.descrizione}
                   </p>
-                  
+
                   {/* --- HASHTAG ORA CLICCABILI (Layout Originale) --- */}
                   {post.hashtags && (
                     <p style={{ color: '#007BFF', margin: '0 0 15px 0', fontSize: '15px', fontWeight: '500' }}>
                       {post.hashtags.split(" ").map((tag, index) => (
-                        <span 
+                        <span
                           key={index}
                           onClick={() => gestisciClickHashtag(tag)}
                           style={{ cursor: 'pointer', marginRight: '5px' }}
@@ -665,18 +673,18 @@ function MainApp() {
                       ))}
                     </p>
                   )}
-                  
+
                   {/* Immagine del Post */}
                   {post.immagine_url && (
                     <div style={{ width: '100%', marginBottom: '15px', borderRadius: '12px', overflow: 'hidden', backgroundColor: '#f0f0f0', display: 'flex', justifyContent: 'center' }}>
-                      <img 
-                        src={post.immagine_url} 
-                        alt="Post" 
-                        style={{ maxWidth: '100%', maxHeight: '550px', objectFit: 'contain' }} 
+                      <img
+                        src={post.immagine_url}
+                        alt="Post"
+                        style={{ maxWidth: '100%', maxHeight: '550px', objectFit: 'contain' }}
                       />
                     </div>
                   )}
-                  
+
                   {/* Azioni del Post: Mi Piace e Commenti */}
                   <div style={{ display: 'flex', gap: '25px', marginTop: '15px', color: '#555', fontWeight: 'bold' }}>
                     <span onClick={() => toggleMiPiace(post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -685,7 +693,7 @@ function MainApp() {
                       </svg>
                       {numeroMiPiace} Mi piace
                     </span>
-                    
+
                     <span onClick={() => setPostInCommento(postInCommento === post.id ? null : post.id)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
@@ -696,28 +704,43 @@ function MainApp() {
 
                   {/* Sezione Espansa dei Commenti */}
                   {postInCommento === post.id && (
-                    <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
-                      {post.post_commenti.length > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
+                    <div style={{ marginTop: '15px', paddingTop: '15px', borderTop: '1px solid #ddd' }}>
+
+                      {post.post_commenti?.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '15px' }}>
                           {post.post_commenti.map(commento => {
                             const puoEliminare = isAdmin || commento.user_id === utente.id;
-                            const nomeCommentatore = "Utente_" + commento.user_id.substring(0, 5);
+
+                            // --- FIX: Ora estraiamo l'email e il nome utente reali dal commento ---
+                            const emailCommentatore = commento.profili?.email || "utente@anonimo.it";
+                            const nomeCommentatore = commento.profili?.username || emailCommentatore.split('@')[0];
 
                             return (
-                              <div key={commento.id} style={{ backgroundColor: '#e9ecef', padding: '10px', borderRadius: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
+                              <div key={commento.id} style={{ backgroundColor: '#f4f5f7', padding: '8px 12px', borderRadius: '8px', fontSize: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+
+                                {/* --- FIX: Aggiunto flex: 1, alignItems e textAlign --- */}
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '2px',
+                                  flex: 1,                  // Fa prendere al testo tutto lo spazio disponibile spingendo la "X" a destra
+                                  alignItems: 'flex-start', // Forza gli elementi (come il nome) a stare incollati a sinistra
+                                  textAlign: 'left',        // Assicura che anche il testo su più righe parta da sinistra
+                                  wordBreak: 'break-word'   // Evita che parole lunghissime sballino la larghezza
+                                }}>
                                   <strong
-                                    onClick={() => apriProfiloUtente(commento.user_id, nomeCommentatore, "")}
-                                    style={{ display: 'block', marginBottom: '3px', cursor: 'pointer', color: '#007BFF' }}
+                                    onClick={() => apriProfiloUtente(commento.user_id, nomeCommentatore, emailCommentatore)}
+                                    style={{ cursor: 'pointer', color: '#007BFF', fontSize: '13px' }}
                                   >
                                     {nomeCommentatore}
                                   </strong>
-                                  {commento.testo}
+                                  <span style={{ color: '#333', lineHeight: '1.4' }}>{commento.testo}</span>
                                 </div>
+
                                 {puoEliminare && (
                                   <button
                                     onClick={() => eliminaCommento(commento.id)}
-                                    style={{ backgroundColor: 'transparent', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '14px' }}
+                                    style={{ backgroundColor: 'transparent', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '12px', padding: '2px', marginLeft: '10px' }}
                                     title="Elimina commento"
                                   >
                                     ❌
@@ -728,20 +751,21 @@ function MainApp() {
                           })}
                         </div>
                       ) : (
-                        <p style={{ color: '#888', fontSize: '14px', fontStyle: 'italic' }}>Nessun commento ancora. Scrivi il primo!</p>
+                        <p style={{ color: '#888', fontSize: '13px', fontStyle: 'italic', marginBottom: '15px' }}>Nessun commento ancora. Scrivi il primo!</p>
                       )}
 
-                      <div style={{ display: 'flex', gap: '10px' }}>
+                      {/* Input più compatto e pulito */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
                         <input
                           type="text"
                           placeholder="Scrivi un commento..."
                           value={commentoTesto}
                           onChange={(e) => setCommentoTesto(e.target.value)}
-                          style={{ flex: 1, padding: '10px', borderRadius: '20px', border: '1px solid #ccc' }}
+                          style={{ flex: 1, padding: '8px 12px', borderRadius: '20px', border: '1px solid #ccc', fontSize: '14px', outline: 'none' }}
                         />
                         <button
                           onClick={() => aggiungiCommento(post.id)}
-                          style={{ padding: '8px 16px', backgroundColor: '#111', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+                          style={{ padding: '8px 16px', backgroundColor: '#007BFF', color: '#fff', border: 'none', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
                         >
                           Invia
                         </button>
@@ -759,8 +783,8 @@ function MainApp() {
 
       {/* 2. VISTA CERCA (QUESTO È IL CODICE D) */}
       {vistaCorrente === 'cerca' && (
-        <Esplora 
-          queryIniziale={queryRicerca} 
+        <Esplora
+          queryIniziale={queryRicerca}
           utente={utente}
           alClickProfilo={apriProfiloUtente}
         />
@@ -769,7 +793,7 @@ function MainApp() {
       {/* --- 2. SCHERMATA DEL CATALOGO SCARPE --- */}
       {vistaCorrente === 'catalogo' && (
         <div style={containerStyle}>
-         
+
           <datalist id="lista-colori">
             <option value="Nero" />
             <option value="Bianco" />
@@ -837,7 +861,7 @@ function MainApp() {
               </div>
             )}
           </div>
-         
+
           {isAdmin && (
             <div style={{ padding: '15px', backgroundColor: '#f1f3f5', borderRadius: '8px' }}>
               <h3 style={{ marginTop: 0, marginBottom: '15px' }}>Area Admin: Gestione Catalogo</h3>
@@ -892,142 +916,142 @@ function MainApp() {
 
 
               return (
-              <li key={scarpa.id} style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', borderLeft: isAdmin ? '5px solid #ffc107' : '5px solid #17A2B8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-               
-                {idInModifica === scarpa.id ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <input type="text" value={brandModificato} onChange={(e) => setBrandModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Brand"/>
-                      <input type="text" value={modelloModificato} onChange={(e) => setModelloModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Modello"/>
+                <li key={scarpa.id} style={{ padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', borderLeft: isAdmin ? '5px solid #ffc107' : '5px solid #17A2B8', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+                  {idInModifica === scarpa.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input type="text" value={brandModificato} onChange={(e) => setBrandModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Brand" />
+                        <input type="text" value={modelloModificato} onChange={(e) => setModelloModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Modello" />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <input type="number" value={prezzoModificato} onChange={(e) => setPrezzoModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Prezzo" />
+                        <input list="lista-colori" value={coloreModificato} onChange={(e) => setColoreModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Colore" />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button onClick={() => salvaModifica(scarpa.id)} style={{ flex: 1, padding: '8px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Salva</button>
+                        <button onClick={() => setIdInModifica(null)} style={{ flex: 1, padding: '8px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Annulla</button>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <input type="number" value={prezzoModificato} onChange={(e) => setPrezzoModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Prezzo"/>
-                      <input list="lista-colori" value={coloreModificato} onChange={(e) => setColoreModificato(e.target.value)} style={{ flex: 1, padding: '8px', width: '100%' }} placeholder="Colore"/>
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={() => salvaModifica(scarpa.id)} style={{ flex: 1, padding: '8px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Salva</button>
-                      <button onClick={() => setIdInModifica(null)} style={{ flex: 1, padding: '8px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Annulla</button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
-                   
-                    <div
-                      onClick={() => isAdmin && inserisciImmagine(scarpa.id)}
-                      title={isAdmin ? "Clicca per aggiungere/modificare l'immagine" : ""}
-                      style={{
-                        width: '160px',
-                        height: '120px',
-                        backgroundColor: '#e9ecef',
-                        borderRadius: '5px',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        cursor: isAdmin ? 'pointer' : 'default',
-                        overflow: 'hidden',
-                        flexShrink: 0,
-                        border: '1px solid #dee2e6',
-                        position: 'relative'
-                      }}
-                    >
-                      {scarpa.immagine ? (
-                        <>
-                          <img src={scarpa.immagine} alt={scarpa.modello} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          {isAdmin && (
-                            <button
-                              onClick={(e) => rimuoviImmagine(e, scarpa.id)}
-                              title="Rimuovi immagine"
-                              style={{ position: 'absolute', top: '5px', right: '5px', backgroundColor: 'rgba(220, 53, 69, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', fontWeight: 'bold' }}
-                            >
-                              X
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        isAdmin ? (
-                          <span style={{ fontSize: '30px', color: '#adb5bd', fontWeight: 'bold' }}>+</span>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+
+                      <div
+                        onClick={() => isAdmin && inserisciImmagine(scarpa.id)}
+                        title={isAdmin ? "Clicca per aggiungere/modificare l'immagine" : ""}
+                        style={{
+                          width: '160px',
+                          height: '120px',
+                          backgroundColor: '#e9ecef',
+                          borderRadius: '5px',
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          cursor: isAdmin ? 'pointer' : 'default',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          border: '1px solid #dee2e6',
+                          position: 'relative'
+                        }}
+                      >
+                        {scarpa.immagine ? (
+                          <>
+                            <img src={scarpa.immagine} alt={scarpa.modello} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {isAdmin && (
+                              <button
+                                onClick={(e) => rimuoviImmagine(e, scarpa.id)}
+                                title="Rimuovi immagine"
+                                style={{ position: 'absolute', top: '5px', right: '5px', backgroundColor: 'rgba(220, 53, 69, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', fontWeight: 'bold' }}
+                              >
+                                X
+                              </button>
+                            )}
+                          </>
                         ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#adb5bd' }}>
-                            <span style={{ fontSize: '30px' }}>👟</span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Nessuna foto</span>
+                          isAdmin ? (
+                            <span style={{ fontSize: '30px', color: '#adb5bd', fontWeight: 'bold' }}>+</span>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#adb5bd' }}>
+                              <span style={{ fontSize: '30px' }}>👟</span>
+                              <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Nessuna foto</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+
+
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                        <div>
+                          <strong style={{ fontSize: '18px', lineHeight: '1.2', marginBottom: '5px' }}>{scarpa.brand}<br />{scarpa.modello}</strong>
+                          <div style={{ color: '#555', fontSize: '14px', display: 'flex', flexDirection: 'column', marginTop: '5px' }}>
+                            <span>Prezzo: €{scarpa.prezzo || 'N/D'}</span>
+                            <span>Colore: {scarpa.colore || 'N/D'}</span>
                           </div>
-                        )
-                      )}
-                    </div>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
+                          <button
+                            onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
+                            style={{
+                              padding: '6px',
+                              backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef',
+                              color: isSalvataOvunque ? '#000' : '#333',
+                              border: '1px solid #ccc',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
+                          </button>
 
 
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-                      <div>
-                        <strong style={{ fontSize: '18px', lineHeight: '1.2', marginBottom: '5px' }}>{scarpa.brand}<br/>{scarpa.modello}</strong>
-                        <div style={{ color: '#555', fontSize: '14px', display: 'flex', flexDirection: 'column', marginTop: '5px' }}>
-                          <span>Prezzo: €{scarpa.prezzo || 'N/D'}</span>
-                          <span>Colore: {scarpa.colore || 'N/D'}</span>
+                          {/* MENU SCELTA RACCOLTE INLINE */}
+                          {scarpaSelezionata === scarpa.id && (
+                            <div style={{ padding: '10px', backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <strong style={{ fontSize: '12px' }}>Salva in:</strong>
+
+                              {raccolte.map(raccolta => (
+                                <label key={raccolta.id} style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={raccolta.scarpe.some(s => s.id === scarpa.id)}
+                                    onChange={() => toggleScarpaInRaccolta(raccolta.id, scarpa)}
+                                  />
+                                  {raccolta.nome_raccolta}
+                                </label>
+                              ))}
+
+
+                              <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+                                <input
+                                  type="text"
+                                  placeholder="Nuova raccolta..."
+                                  value={nomeNuovaRaccolta}
+                                  onChange={(e) => setNomeNuovaRaccolta(e.target.value)}
+                                  style={{ flex: 1, padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '3px' }}
+                                />
+                                <button onClick={creaRaccolta} style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#111', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Crea</button>
+                              </div>
+                            </div>
+                          )}
+
+
+                          {isAdmin && (
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
+                              <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                     
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '15px' }}>
-                        <button
-                          onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
-                          style={{
-                            padding: '6px',
-                            backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef',
-                            color: isSalvataOvunque ? '#000' : '#333',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 'bold'
-                          }}
-                        >
-                          {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
-                        </button>
-
-
-                        {/* MENU SCELTA RACCOLTE INLINE */}
-                        {scarpaSelezionata === scarpa.id && (
-                          <div style={{ padding: '10px', backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '5px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <strong style={{ fontSize: '12px' }}>Salva in:</strong>
-                           
-                            {raccolte.map(raccolta => (
-                              <label key={raccolta.id} style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={raccolta.scarpe.some(s => s.id === scarpa.id)}
-                                  onChange={() => toggleScarpaInRaccolta(raccolta.id, scarpa)}
-                                />
-                                {raccolta.nome_raccolta}
-                              </label>
-                            ))}
-
-
-                            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-                              <input
-                                type="text"
-                                placeholder="Nuova raccolta..."
-                                value={nomeNuovaRaccolta}
-                                onChange={(e) => setNomeNuovaRaccolta(e.target.value)}
-                                style={{ flex: 1, padding: '4px', fontSize: '12px', border: '1px solid #ccc', borderRadius: '3px' }}
-                              />
-                              <button onClick={creaRaccolta} style={{ padding: '4px 8px', fontSize: '12px', backgroundColor: '#111', color: '#fff', border: 'none', borderRadius: '3px', cursor: 'pointer' }}>Crea</button>
-                            </div>
-                          </div>
-                        )}
-
-
-                        {isAdmin && (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
-                            <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  </div>
-                )}
-              </li>
+                  )}
+                </li>
               );
             })}
-           
+
           </ul>
           {scarpeFiltrate.length === 0 && !inCaricamento && (
             <p style={{ color: 'gray', textAlign: 'center', fontStyle: 'italic', marginTop: '30px' }}>Nessuna scarpa trovata.</p>
@@ -1037,125 +1061,125 @@ function MainApp() {
 
 
       {/* SCHERMATA DEL TUO PROFILO */}
-        {vistaCorrente === 'profilo' && (
-          <div>
-            <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>Il Tuo Profilo</h1>
-            
-            <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
-              <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#28A745', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
-                {/* Prende l'iniziale dall'email per sicurezza */}
-                {(utente?.email || mioProfilo?.username || "U").charAt(0).toUpperCase()}
-              </div>
-              
-              {/* Mostra il nome utente oppure, se non c'è, la prima parte dell'email */}
-              <h2 style={{ margin: '0 0 5px 0' }}>
-                @{mioProfilo?.username || utente?.email?.split('@')[0] || "Utente"}
-              </h2>
-              
-              {/* --- NUOVO: MOSTRA L'EMAIL COMPLETA QUI SOTTO --- */}
-              <p style={{ color: '#666', margin: '0 0 20px 0', fontSize: '15px' }}>
-                {utente?.email}
-              </p>
-              {/* ---------------------------------------------- */}
-              
-              {/* I TUOI FOLLOWER E SEGUITI */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
-                <div>
-                  <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold' }}>{mieRelazioni?.followers || 0}</span>
-                  <span style={{ fontSize: '13px', color: '#777' }}>Follower</span>
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold' }}>{mieRelazioni?.following || 0}</span>
-                  <span style={{ fontSize: '13px', color: '#777' }}>Seguiti</span>
-                </div>
-              </div>
+      {vistaCorrente === 'profilo' && (
+        <div>
+          <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>Il Tuo Profilo</h1>
 
-              <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Logout</button>
+          <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
+            <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#28A745', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
+              {/* Prende l'iniziale dall'email per sicurezza */}
+              {(utente?.email || mioProfilo?.username || "U").charAt(0).toUpperCase()}
             </div>
 
-            {/* --- SEZIONE "LE TUE RACCOLTE" - VERSIONE MIGLIORATA --- */}
-<div style={{ marginTop: '40px' }}>
-  <h2 style={{ fontSize: '22px', fontWeight: 'bold', borderBottom: '2px solid #111', paddingBottom: '10px', marginBottom: '20px' }}>
-    Le Tue Raccolte
-  </h2>
-  
-  {raccolte.length > 0 ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-      {raccolte.map(r => (
-        <div key={r.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'relative' }}>
-          
-          {/* Header Raccolta: Titolo + Tasto Elimina */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '30px' }}>📁</span>
+            {/* Mostra il nome utente oppure, se non c'è, la prima parte dell'email */}
+            <h2 style={{ margin: '0 0 5px 0' }}>
+              @{mioProfilo?.username || utente?.email?.split('@')[0] || "Utente"}
+            </h2>
+
+            {/* --- NUOVO: MOSTRA L'EMAIL COMPLETA QUI SOTTO --- */}
+            <p style={{ color: '#666', margin: '0 0 20px 0', fontSize: '15px' }}>
+              {utente?.email}
+            </p>
+            {/* ---------------------------------------------- */}
+
+            {/* I TUOI FOLLOWER E SEGUITI */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
               <div>
-                <strong style={{ fontSize: '20px', color: '#111' }}>{r.nome_raccolta}</strong>
-                <span style={{ display: 'block', fontSize: '14px', color: '#888' }}>{r.scarpe?.length || 0} scarpe salvate</span>
+                <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold' }}>{mieRelazioni?.followers || 0}</span>
+                <span style={{ fontSize: '13px', color: '#777' }}>Follower</span>
+              </div>
+              <div>
+                <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold' }}>{mieRelazioni?.following || 0}</span>
+                <span style={{ fontSize: '13px', color: '#777' }}>Seguiti</span>
               </div>
             </div>
-            
-            {/* TASTO ELIMINA */}
-            <button 
-              onClick={() => eliminaRaccolta(r.id)}
-              style={{ backgroundColor: '#fff', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
-            >
-              Elimina
-            </button>
+
+            <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Logout</button>
           </div>
 
-          {/* Griglia delle scarpe - PIÙ GRANDE E BLOCCATA */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
-            {r.scarpe && r.scarpe.length > 0 ? (
-              r.scarpe.map(s => (
-                <div key={s.id} style={{ textAlign: 'center', padding: '10px', border: '1px solid #eee', borderRadius: '12px', backgroundColor: '#fafafa' }}>
-                  
-                  {/* CONTENITORE IMMAGINE RIGIDO */}
-                  <div style={{ width: '100%', height: '210px', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {s.immagine ? (
-                      <img 
-                        src={s.immagine} 
-                        alt={s.modello} 
-                        style={{ width: '100%', height: '200%', objectFit: 'contain', display: 'block' }} 
-                      />
-                    ) : (
-                      <span style={{ fontSize: '40px' }}>👟</span>
-                    )}
-                  </div>
-                  {/* --------------------------- */}
+          {/* --- SEZIONE "LE TUE RACCOLTE" - VERSIONE MIGLIORATA --- */}
+          <div style={{ marginTop: '40px' }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 'bold', borderBottom: '2px solid #111', paddingBottom: '10px', marginBottom: '20px' }}>
+              Le Tue Raccolte
+            </h2>
 
-                  {/* NUOVA ZONA TESTO PIÙ SPAZIOSA E ALLINEATA */}
-                  <div style={{ 
-                    marginTop: '5px',      /* Spazio vuoto tra l'immagine e il testo */
-                    minHeight: '100px',      /* Altezza minima fissa per la zona testo */
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    justifyContent: 'center' /* Mantiene il testo ben centrato in questo spazio */
-                  }}>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111', marginBottom: '4px' }}>{s.brand}</div>
-                    <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.4' }}>{s.modello}</div>
+            {raccolte.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                {raccolte.map(r => (
+                  <div key={r.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'relative' }}>
+
+                    {/* Header Raccolta: Titolo + Tasto Elimina */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontSize: '30px' }}>📁</span>
+                        <div>
+                          <strong style={{ fontSize: '20px', color: '#111' }}>{r.nome_raccolta}</strong>
+                          <span style={{ display: 'block', fontSize: '14px', color: '#888' }}>{r.scarpe?.length || 0} scarpe salvate</span>
+                        </div>
+                      </div>
+
+                      {/* TASTO ELIMINA */}
+                      <button
+                        onClick={() => eliminaRaccolta(r.id)}
+                        style={{ backgroundColor: '#fff', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+                      >
+                        Elimina
+                      </button>
+                    </div>
+
+                    {/* Griglia delle scarpe - PIÙ GRANDE E BLOCCATA */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                      {r.scarpe && r.scarpe.length > 0 ? (
+                        r.scarpe.map(s => (
+                          <div key={s.id} style={{ textAlign: 'center', padding: '10px', border: '1px solid #eee', borderRadius: '12px', backgroundColor: '#fafafa' }}>
+
+                            {/* CONTENITORE IMMAGINE RIGIDO */}
+                            <div style={{ width: '100%', height: '210px', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {s.immagine ? (
+                                <img
+                                  src={s.immagine}
+                                  alt={s.modello}
+                                  style={{ width: '100%', height: '200%', objectFit: 'contain', display: 'block' }}
+                                />
+                              ) : (
+                                <span style={{ fontSize: '40px' }}>👟</span>
+                              )}
+                            </div>
+                            {/* --------------------------- */}
+
+                            {/* NUOVA ZONA TESTO PIÙ SPAZIOSA E ALLINEATA */}
+                            <div style={{
+                              marginTop: '5px',      /* Spazio vuoto tra l'immagine e il testo */
+                              minHeight: '100px',      /* Altezza minima fissa per la zona testo */
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center' /* Mantiene il testo ben centrato in questo spazio */
+                            }}>
+                              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#111', marginBottom: '4px' }}>{s.brand}</div>
+                              <div style={{ fontSize: '13px', color: '#666', lineHeight: '1.4' }}>{s.modello}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p style={{ fontSize: '14px', color: '#bbb', gridColumn: '1/-1', textAlign: 'center', padding: '20px' }}>
+                          Questa raccolta è vuota.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
-              <p style={{ fontSize: '14px', color: '#bbb', gridColumn: '1/-1', textAlign: 'center', padding: '20px' }}>
-                Questa raccolta è vuota.
-              </p>
+              <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '15px', color: '#999' }}>
+                <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>📂</span>
+                <p>Non hai ancora creato nessuna raccolta.</p>
+              </div>
             )}
           </div>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#fff', borderRadius: '15px', color: '#999' }}>
-      <span style={{ fontSize: '40px', display: 'block', marginBottom: '10px' }}>📂</span>
-      <p>Non hai ancora creato nessuna raccolta.</p>
-    </div>
-  )}
-</div>
-            {/* ------------------------------------------- */}
+          {/* ------------------------------------------- */}
 
-          </div>
-        )}
+        </div>
+      )}
 
 
       {/* --- 4. SCHERMATA PROFILO ALTRO UTENTE --- */}
@@ -1171,32 +1195,32 @@ function MainApp() {
             </button>
             {seguitiInfo?.isFriend && (
               <span style={{ backgroundColor: '#d4edda', color: '#155724', padding: '5px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' }}>
-                🤝 Siete Amici
+                Ora siete amici
               </span>
             )}
           </div>
 
           <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            
+
             {/* Immagine Profilo (Prende l'iniziale dall'email per sicurezza) */}
             <div style={{
               width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white',
               display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto'
             }}>
-               {(profiloSelezionato.email || profiloSelezionato.username || "U").charAt(0).toUpperCase()}
+              {(profiloSelezionato.email || profiloSelezionato.username || "U").charAt(0).toUpperCase()}
             </div>
 
             {/* Nome Utente: Taglia l'email alla @ se manca lo username */}
             <h2 style={{ margin: '0 0 5px 0' }}>
               @{profiloSelezionato.username || profiloSelezionato.email?.split('@')[0] || 'Utente'}
             </h2>
-            
+
             {/* --- NUOVO: MOSTRA L'EMAIL COMPLETA QUI SOTTO --- */}
             <p style={{ color: '#666', margin: '0 0 15px 0', fontSize: '15px' }}>
               {profiloSelezionato.email}
             </p>
             {/* ---------------------------------------------- */}
-            
+
             {/* DOVE APPAIONO FOLLOWER E SEGUITI: Sotto il nome utente e l'email */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', margin: '15px 0', color: '#666' }}>
               <span><strong>{seguitiInfo?.followers || 0}</strong> Follower</span>
@@ -1204,25 +1228,30 @@ function MainApp() {
             </div>
 
             {/* Pulsante Segui / Smetti di seguire */}
-              <button 
-                onClick={() => toggleSegui(profiloSelezionato.id)} 
-                style={{ 
-                  padding: '10px 30px', 
-                  borderRadius: '25px', 
-                  border: 'none', 
-                  fontWeight: 'bold', 
-                  cursor: 'pointer', 
-                  backgroundColor: seguitiInfo?.isFollowing ? '#e9ecef' : '#111', 
-                  color: seguitiInfo?.isFollowing ? '#111' : '#fff',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {seguitiInfo?.isFollowing ? 'Smetti di seguire' : 'Segui'}
-              </button>
+            <button
+              onClick={() => toggleSegui(profiloSelezionato.id)}
+              style={{
+                padding: '10px 30px',
+                borderRadius: '25px',
+                border: 'none',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                backgroundColor: seguitiInfo?.isFollowing ? '#e9ecef' : '#111',
+                color: seguitiInfo?.isFollowing ? '#111' : '#fff',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              {seguitiInfo?.isFollowing
+                ? 'Smetti di seguire'
+                : seguitiInfo?.miSegue
+                  ? 'Segui anche tu'
+                  : 'Segui'
+              }
+            </button>
           </div>
 
           <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-             <p style={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>Le raccolte di questo utente sono private.</p>
+            <p style={{ textAlign: 'center', color: '#999', fontStyle: 'italic' }}>Le raccolte di questo utente sono private.</p>
           </div>
         </div>
       )}
@@ -1242,7 +1271,7 @@ function MainApp() {
         boxShadow: '0 -2px 10px rgba(0,0,0,0.05)',
         zIndex: 1000
       }}>
-       
+
         {/* 1. Bottone Feed (Estrema Sinistra) */}
         <button
           onClick={() => setVistaCorrente('social')}
@@ -1287,26 +1316,26 @@ function MainApp() {
             setQueryRicerca(""); // Azzera vecchie ricerche
             setVistaCorrente('cerca'); // Apre la nuova pagina Esplora
           }}
-          style={{ 
-            background: 'none', 
-            border: 'none', 
-            cursor: 'pointer', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center', 
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             // Diventa scuro se sei nella pagina Cerca, altrimenti resta grigio
-            color: vistaCorrente === 'cerca' ? '#111' : '#aaa' 
+            color: vistaCorrente === 'cerca' ? '#111' : '#aaa'
           }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
-          <span style={{ 
-            fontSize: '10px', 
-            marginTop: '4px', 
+          <span style={{
+            fontSize: '10px',
+            marginTop: '4px',
             // Diventa in grassetto se sei nella pagina Cerca
-            fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal' 
+            fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal'
           }}>
             Cerca
           </span>
