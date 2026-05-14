@@ -64,6 +64,8 @@ function MainApp() {
   const [mieRelazioni, setMieRelazioni] = useState({ followers: 0, following: 0 });
   const [mioProfilo, setMioProfilo] = useState(null);
 
+  const [modaleRelazioni, setModaleRelazioni] = useState({ visibile: false, titolo: '', utenti: [] });
+
   const [miSegue, setMiSegue] = useState(false);
   const [loSeguo, setLoSeguo] = useState(false);
 
@@ -140,16 +142,26 @@ function MainApp() {
   }, []);
 
 
-
+  // --- SCROLL IN CIMA AUTOMATICO ---
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [vistaCorrente]);
 
   useEffect(() => {
-    if (utente) {
+    if (utente?.id) {
+      // UTENTE ENTRATO (Admin o Utente normale)
       scaricaCatalogo();
-      caricaRaccolte();
+      caricaRaccolte(utente.id); // Passiamo l'ID direttamente per sicurezza
       scaricaPosts();
       caricaMioProfilo(utente.id);
+    } else {
+      // UTENTE USCITO (Logout)
+      setRaccolte([]);
+      setMioProfilo(null);
+      setMieRelazioni({ followers: 0, following: 0 });
+      console.log("Stati svuotati post-logout");
     }
-  }, [utente]);
+  }, [utente]); // React reagisce ogni volta che 'utente' cambia
 
 
 
@@ -176,6 +188,47 @@ function MainApp() {
       isFollowing: !!ioSeguoLui,
       isFriend: (!!ioSeguoLui && !!luiSegueMe)
     });
+  };
+
+  const apriListaRelazioni = async (userId, tipo) => {
+    // Apri subito il modale in stato di caricamento
+    setModaleRelazioni({ visibile: true, titolo: 'Caricamento...', utenti: [] });
+
+    try {
+      // 1. Definisci cosa stiamo cercando
+      const colonnaFiltro = tipo === 'follower' ? 'following_id' : 'follower_id';
+      const colonnaTarget = tipo === 'follower' ? 'follower_id' : 'following_id';
+
+      // 2. Trova le relazioni in database
+      const { data: relazioni } = await supabase
+        .from('seguiti')
+        .select('*')
+        .eq(colonnaFiltro, userId);
+
+      if (!relazioni || relazioni.length === 0) {
+        setModaleRelazioni({ visibile: true, titolo: tipo === 'follower' ? 'Follower' : 'Seguiti', utenti: [] });
+        return;
+      }
+
+      // 3. Estrai gli ID e cerca i profili associati
+      const ids = relazioni.map(r => r[colonnaTarget]);
+
+      const { data: profili } = await supabase
+        .from('profili')
+        .select('id, username, email')
+        .in('id', ids);
+
+      // Mostra i risultati
+      setModaleRelazioni({
+        visibile: true,
+        titolo: tipo === 'follower' ? 'Follower' : 'Seguiti',
+        utenti: profili || []
+      });
+
+    } catch (error) {
+      console.error(error);
+      setModaleRelazioni({ visibile: false, titolo: '', utenti: [] });
+    }
   };
 
 
@@ -209,17 +262,64 @@ function MainApp() {
   };
 
 
-  const apriProfiloUtente = (userId, nomeUtente, emailUtente) => {
+  const apriProfiloUtente = async (userId, nomeUtente, emailUtente) => {
+    // 1. Controllo se è il mio profilo
     if (userId === utente.id) {
       setVistaCorrente('profilo');
+      // Opzionale: ricarica le tue raccolte (comprese le private)
+      caricaRaccolte(utente.id);
+      return;
+    }
+
+    // 2. Impostiamo i dati dell'altro utente
+    setProfiloSelezionato({
+      id: userId,
+      username: nomeUtente || "Utente",
+      email: emailUtente
+    });
+
+    // 3. Prepariamo l'interfaccia
+    setRaccolte([]); // Svuota per evitare dati vecchi
+    setVistaCorrente('profilo_altro_utente');
+
+    // 4. Carichiamo relazioni e raccolte in parallelo
+    caricaRelazioniProfilo(userId);
+
+    try {
+      // NOTA: Usiamo '*, scarpe(*)' se hai una tabella relazionata, 
+      // altrimenti '*' va bene se i dati sono nella stessa riga.
+      const { data, error } = await supabase
+        .from('raccolte_scarpe')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('pubblica', true)
+        .order('nome_raccolta');
+
+      if (error) throw error;
+
+      console.log("Raccolte pubbliche trovate:", data); // Per debug
+      setRaccolte(data || []);
+
+    } catch (error) {
+      console.error("Errore caricamento profilo esterno:", error.message);
+    }
+  };
+
+  const togglePrivacyRaccolta = async (raccolta) => {
+    const nuovaPrivacy = !raccolta.pubblica;
+
+    const { error } = await supabase
+      .from('raccolte_scarpe')
+      .update({ pubblica: nuovaPrivacy })
+      .eq('id', raccolta.id);
+
+    if (!error) {
+      // Aggiorna lo stato locale
+      setRaccolte(raccolte.map(r =>
+        r.id === raccolta.id ? { ...r, pubblica: nuovaPrivacy } : r
+      ));
     } else {
-      setProfiloSelezionato({
-        id: userId,
-        username: nomeUtente || "Utente",
-        email: emailUtente
-      });
-      setVistaCorrente('profilo_altro_utente');
-      caricaRelazioniProfilo(userId);
+      alert("Errore nell'aggiornamento della privacy: " + error.message);
     }
   };
 
@@ -310,16 +410,26 @@ function MainApp() {
 
 
 
-  const caricaRaccolte = async () => {
+  const caricaRaccolte = async (idDaCercare) => {
+    // Se non passiamo un ID, usiamo quello dell'utente loggato come fallback
+    const id = idDaCercare || utente?.id;
+
+    if (!id) {
+      setRaccolte([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('raccolte_scarpe')
-      .select('*, scarpe(*)')
+      .select('*') // <-- ECCO IL FIX: rimosso scarpe(*) che mandava in tilt Supabase!
+      .eq('user_id', id)
       .order('nome_raccolta');
 
-    if (!error && data) {
-      setRaccolte(data);
+    if (!error) {
+      setRaccolte(data || []);
     } else {
-      console.error("Errore nel caricamento raccolte:", error);
+      console.error("Errore database raccolte:", error.message);
+      setRaccolte([]);
     }
   };
 
@@ -536,9 +646,11 @@ function MainApp() {
 
 
   const logout = async () => {
+    setRaccolte([]);
+    setMioProfilo(null);
     await supabase.auth.signOut();
+    setVistaCorrente('social');
   };
-
 
   // --- SCHERMATA DI LOGIN ---
   if (!utente) {
@@ -695,10 +807,10 @@ function MainApp() {
                     {(isAdmin || post.user_id === utente.id) && (
                       <button
                         onClick={() => eliminaPost(post.id)}
-                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', padding: '5px' }}
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', padding: '5px', color: '#ff0000', fontWeight: 'bold' }}
                         title="Elimina post"
                       >
-                        ❌
+                        ✖
                       </button>
                     )}
                   </div>
@@ -785,10 +897,10 @@ function MainApp() {
                                 {puoEliminare && (
                                   <button
                                     onClick={() => eliminaCommento(commento.id)}
-                                    style={{ backgroundColor: 'transparent', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '12px', padding: '2px', marginLeft: '10px' }}
+                                    style={{ backgroundColor: 'transparent', border: 'none', color: '#ff0000', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px', padding: '2px', marginLeft: '10px' }}
                                     title="Elimina commento"
                                   >
-                                    ❌
+                                    ✖
                                   </button>
                                 )}
                               </div>
@@ -1093,8 +1205,29 @@ function MainApp() {
       {/* SCHERMATA PROFILO */}
       {vistaCorrente === 'profilo' && (
         <div style={{ ...containerStyle }}>
-          <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px', color: '#111111' }}>Il Tuo Profilo</h1>
 
+          {/* --- BOTTONE TORNA AL FEED (STILE GRIGIO) --- */}
+          <button
+            onClick={() => setVistaCorrente('social')}
+            style={{
+              padding: '8px 12px',
+              background: '#f0f2f5',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: '#111111',
+              fontWeight: 'bold',
+              marginBottom: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px'
+            }}
+          >
+            ← Torna al Feed
+          </button>
+
+          <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px', color: '#111111' }}>Il Tuo Profilo</h1>
+          {/* ... resto del codice invariato ... */}
           <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#28A745', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
               {(utente?.email || mioProfilo?.username || "U").charAt(0).toUpperCase()}
@@ -1106,16 +1239,25 @@ function MainApp() {
               {utente?.email}
             </p>
 
+            {/* --- INIZIO PARTE AGGIORNATA CON I CLICK E CONTROLLO ID --- */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
-              <div>
+              <div
+                onClick={() => utente?.id && apriListaRelazioni(utente.id, 'follower')}
+                style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+              >
                 <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold', color: '#111111' }}>{mieRelazioni?.followers || 0}</span>
                 <span style={{ fontSize: '13px', color: '#777777' }}>Follower</span>
               </div>
-              <div>
+
+              <div
+                onClick={() => utente?.id && apriListaRelazioni(utente.id, 'seguiti')}
+                style={{ cursor: 'pointer', transition: 'opacity 0.2s' }}
+              >
                 <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold', color: '#111111' }}>{mieRelazioni?.following || 0}</span>
                 <span style={{ fontSize: '13px', color: '#777777' }}>Seguiti</span>
               </div>
             </div>
+            {/* --- FINE PARTE AGGIORNATA --- */}
 
             <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Logout</button>
           </div>
@@ -1137,12 +1279,38 @@ function MainApp() {
                           <span style={{ display: 'block', fontSize: '14px', color: '#777777' }}>{r.scarpe?.length || 0} scarpe salvate</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => eliminaRaccolta(r.id)}
-                        style={{ backgroundColor: '#fff', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', flexShrink: 0 }}
-                      >
-                        Elimina
-                      </button>
+
+                      {/* --- INIZIO ZONA BOTTONI (PRIVACY E ELIMINA) --- */}
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <button
+                          onClick={() => togglePrivacyRaccolta(r)}
+                          style={{
+                            backgroundColor: r.pubblica ? '#e3f2fd' : '#f5f5f5',
+                            color: r.pubblica ? '#1976d2' : '#757575',
+                            border: '1px solid ' + (r.pubblica ? '#bbdefb' : '#ddd'),
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: 'bold',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            flexShrink: 0
+                          }}
+                        >
+                          {r.pubblica ? '🌍 Pubblica' : '🔒 Privata'}
+                        </button>
+
+                        <button
+                          onClick={() => eliminaRaccolta(r.id)}
+                          style={{ backgroundColor: '#fff', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', flexShrink: 0 }}
+                        >
+                          Elimina
+                        </button>
+                      </div>
+                      {/* --- FINE ZONA BOTTONI --- */}
+
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
@@ -1185,10 +1353,22 @@ function MainApp() {
       {/* PROFILO ALTRO UTENTE */}
       {vistaCorrente === 'profilo_altro_utente' && profiloSelezionato.id && (
         <div style={containerStyle}>
+          {/* --- TESTATA PROFILO --- */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #eee', paddingBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
             <button
               onClick={() => setVistaCorrente('social')}
-              style={{ padding: '8px 12px', background: '#f0f2f5', border: 'none', borderRadius: '8px', cursor: 'pointer', color: '#111111' }}
+              style={{
+                padding: '8px 12px',
+                background: '#f0f2f5',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                color: '#111111',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
             >
               ← Torna al Feed
             </button>
@@ -1199,6 +1379,7 @@ function MainApp() {
             )}
           </div>
 
+          {/* --- AVATAR E INFO --- */}
           <div style={{ marginTop: '20px', textAlign: 'center' }}>
             <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
               {(profiloSelezionato.email || profiloSelezionato.username || "U").charAt(0).toUpperCase()}
@@ -1210,9 +1391,23 @@ function MainApp() {
               {profiloSelezionato.email}
             </p>
 
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', margin: '15px 0', color: '#333333' }}>
-              <span><strong style={{ color: '#111111' }}>{seguitiInfo?.followers || 0}</strong> Follower</span>
-              <span><strong style={{ color: '#111111' }}>{seguitiInfo?.following || 0}</strong> Seguiti</span>
+            {/* --- STATISTICHE --- */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
+              <div
+                onClick={() => profiloSelezionato?.id && apriListaRelazioni(profiloSelezionato.id, 'follower')}
+                style={{ cursor: 'pointer', textAlign: 'center', transition: 'opacity 0.2s' }}
+              >
+                <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold', color: '#111111' }}>{seguitiInfo?.followers || 0}</span>
+                <span style={{ fontSize: '13px', color: '#777777' }}>Follower</span>
+              </div>
+
+              <div
+                onClick={() => profiloSelezionato?.id && apriListaRelazioni(profiloSelezionato.id, 'seguiti')}
+                style={{ cursor: 'pointer', textAlign: 'center', transition: 'opacity 0.2s' }}
+              >
+                <span style={{ display: 'block', fontSize: '24px', fontWeight: 'bold', color: '#111111' }}>{seguitiInfo?.following || 0}</span>
+                <span style={{ fontSize: '13px', color: '#777777' }}>Seguiti</span>
+              </div>
             </div>
 
             <button
@@ -1228,17 +1423,50 @@ function MainApp() {
                 transition: 'all 0.2s ease'
               }}
             >
-              {seguitiInfo?.isFollowing
-                ? 'Smetti di seguire'
-                : seguitiInfo?.miSegue
-                  ? 'Segui anche tu'
-                  : 'Segui'
-              }
+              {seguitiInfo?.isFollowing ? 'Smetti di seguire' : seguitiInfo?.miSegue ? 'Segui anche tu' : 'Segui'}
             </button>
           </div>
 
+          {/* --- SEZIONE RACCOLTE PUBBLICHE (AGGIORNATA) --- */}
           <div style={{ marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
-            <p style={{ textAlign: 'center', color: '#777777', fontStyle: 'italic' }}>Le raccolte di questo utente sono private.</p>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#111', marginBottom: '20px' }}>Raccolte Pubbliche</h3>
+
+            {raccolte.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                {raccolte.map(r => (
+                  <div key={r.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#111111' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+                      <span style={{ fontSize: '24px' }}>📁</span>
+                      <div>
+                        <strong style={{ fontSize: '18px' }}>{r.nome_raccolta}</strong>
+                        <span style={{ display: 'block', fontSize: '13px', color: '#777' }}>{r.scarpe?.length || 0} scarpe</span>
+                      </div>
+                    </div>
+
+                    {/* Griglia scarpe della raccolta dell'altro utente */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '15px' }}>
+                      {r.scarpe && r.scarpe.map((s, idx) => (
+                        <div key={idx} style={{ textAlign: 'center', padding: '10px', border: '1px solid #f0f0f0', borderRadius: '10px' }}>
+                          <img
+                            src={s.immagine || s.immagine_url || 'https://via.placeholder.com/150'}
+                            alt={s.modello}
+                            style={{ width: '100%', height: '100px', objectFit: 'contain' }}
+                          />
+                          <div style={{ fontSize: '12px', fontWeight: 'bold', marginTop: '5px' }}>{s.brand}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '30px' }}>
+                <span style={{ fontSize: '30px', display: 'block', marginBottom: '10px' }}>🔒</span>
+                <p style={{ color: '#777777', fontStyle: 'italic', margin: 0 }}>
+                  Questo utente non ha ancora raccolte pubbliche.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1268,71 +1496,132 @@ function MainApp() {
           boxSizing: 'border-box',
         }}>
 
-        <button
-          onClick={() => setVistaCorrente('social')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'social' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'social' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-          </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'social' ? 'bold' : 'normal' }}>Feed</span>
-        </button>
-
-        <button
-          onClick={() => setVistaCorrente('profilo')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'profilo' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'profilo' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-            <circle cx="12" cy="7" r="4"></circle>
-          </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'profilo' ? 'bold' : 'normal' }}>Profilo</span>
-        </button>
-
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <button
-            onClick={() => setVistaCorrente('crea_post')}
-            style={{ backgroundColor: '#111111', color: 'white', border: 'none', borderRadius: '50%', width: '50px', height: '50px', fontSize: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transform: 'translateY(-10px)', flexShrink: 0 }}
+            onClick={() => setVistaCorrente('social')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'social' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'social' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'social' ? 'bold' : 'normal' }}>Feed</span>
+          </button>
+
+          <button
+            onClick={() => setVistaCorrente('profilo')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'profilo' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'profilo' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'profilo' ? 'bold' : 'normal' }}>Profilo</span>
+          </button>
+
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <button
+              onClick={() => setVistaCorrente('crea_post')}
+              style={{ backgroundColor: '#111111', color: 'white', border: 'none', borderRadius: '50%', width: '50px', height: '50px', fontSize: '28px', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', transform: 'translateY(-10px)', flexShrink: 0 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              setQueryRicerca("");
+              setVistaCorrente('cerca');
+            }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'cerca' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
+            <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal' }}>Cerca</span>
           </button>
-        </div>
 
-        <button
-          onClick={() => {
-            setQueryRicerca("");
-            setVistaCorrente('cerca');
-          }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'cerca' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal' }}>Cerca</span>
-        </button>
-
-        <button
-          onClick={() => setVistaCorrente('catalogo')}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'catalogo' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'catalogo' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'catalogo' ? 'bold' : 'normal' }}>Catalogo</span>
-        </button>
+          <button
+            onClick={() => setVistaCorrente('catalogo')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'catalogo' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={vistaCorrente === 'catalogo' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'catalogo' ? 'bold' : 'normal' }}>Catalogo</span>
+          </button>
 
         </div> {/* end inner nav */}
       </div>   {/* end outer nav */}
 
-    </div>
+      {/* --- INIZIO PASSO 4: MODALE LISTA UTENTI (FOLLOWER/SEGUITI) --- */}
+      {modaleRelazioni?.visibile && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2000,
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: '15px', width: '100%', maxWidth: '400px',
+            maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+          }}>
+            {/* Intestazione */}
+            <div style={{ padding: '15px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, color: '#111', fontSize: '18px' }}>{modaleRelazioni.titolo}</h3>
+              <button
+                onClick={() => setModaleRelazioni({ visibile: false, titolo: '', utenti: [] })}
+                style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#111', padding: '0 5px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Lista Utenti */}
+            <div style={{ padding: '15px', overflowY: 'auto', flex: 1 }}>
+              {modaleRelazioni.titolo === 'Caricamento...' ? (
+                <p style={{ textAlign: 'center', color: '#777' }}>Caricamento in corso...</p>
+              ) : modaleRelazioni.utenti.length === 0 ? (
+                <p style={{ textAlign: 'center', color: '#777' }}>Nessun utente trovato.</p>
+              ) : (
+                modaleRelazioni.utenti.map(u => {
+                  const nome = u.username || u.email?.split('@')[0] || 'Utente';
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => {
+                        setModaleRelazioni({ visibile: false, titolo: '', utenti: [] });
+                        apriProfiloUtente(u.id, nome, u.email); // Reindirizza al profilo!
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '15px', padding: '12px 0',
+                        borderBottom: '1px solid #f0f0f0', cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ width: '45px', height: '45px', borderRadius: '50%', backgroundColor: '#28A745', color: '#fff', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', fontSize: '18px' }}>
+                        {nome.charAt(0).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ display: 'block', color: '#111', fontSize: '16px' }}>@{nome}</strong>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- FINE PASSO 4 --- */}
+
+    </div> /* fine contenitore principale app */
   );
 }
 
