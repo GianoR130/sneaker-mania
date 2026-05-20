@@ -7,7 +7,7 @@ import FeedSocial from './FeedSocial';
 import CatalogoScarpe from './CatalogoScarpe';
 import ProfiloUtente from './ProfiloUtente';
 import ProfiloAltroUtente from './ProfiloAltroUtente';
-import SchermataMoLogin from './SchermataMoLogin';
+import SchermataLogin from './SchermataLogin';
 import NavBar from './NavBar';
 import ModaleRelazioni from './ModaleRelazioni';
 
@@ -74,6 +74,9 @@ function MainApp() {
 
   const [miSegue, setMiSegue] = useState(false);
   const [loSeguo, setLoSeguo] = useState(false);
+
+  const [genereNuovo, setGenereNuovo] = useState('Unisex');
+  const [genereModificato, setGenereModificato] = useState('Unisex');
 
 
 
@@ -520,6 +523,7 @@ function MainApp() {
         modello: nuovoModello,
         prezzo: nuovoPrezzo,
         colore: nuovoColore,
+        genere: genereNuovo, // ➕ Invia il genere selezionato a Supabase
         user_id: utente.id
       }
     ]);
@@ -531,6 +535,7 @@ function MainApp() {
         setNuovoModello('');
         setNuovoPrezzo('');
         setNuovoColore('');
+        setGenereNuovo('Unisex'); // ➕ Resetta la tendina sul valore di default
       }
       scaricaCatalogo();
     }
@@ -552,19 +557,27 @@ function MainApp() {
     setModelloModificato(scarpa.modello);
     setPrezzoModificato(scarpa.prezzo || '');
     setColoreModificato(scarpa.colore || '');
+    setGenereModificato(scarpa.genere || 'Unisex');
   };
 
 
   const salvaModifica = async (idScarpa) => {
-    const { error } = await supabase.from('scarpe').update({
-      brand: brandModificato,
-      modello: modelloModificato,
-      prezzo: prezzoModificato,
-      colore: coloreModificato
-    }).eq('id', idScarpa);
+    const { error } = await supabase
+      .from('scarpe')
+      .update({
+        brand: brandModificato,
+        modello: modelloModificato,
+        prezzo: prezzoModificato,
+        colore: coloreModificato,
+        genere: genereModificato
+      })
+      .eq('id', idScarpa);
 
     if (error) alert("Errore: " + error.message);
-    else { setIdInModifica(null); scaricaCatalogo(); }
+    else {
+      setIdInModifica(null);
+      scaricaCatalogo();
+    }
   };
 
 
@@ -661,7 +674,7 @@ function MainApp() {
   // --- SCHERMATA DI LOGIN ---
   if (!utente) {
     return (
-      <SchermataMoLogin
+      <SchermataLogin
         email={email}
         setEmail={setEmail}
         password={password}
@@ -791,6 +804,10 @@ function MainApp() {
           setPrezzoModificato={setPrezzoModificato}
           coloreModificato={coloreModificato}
           setColoreModificato={setColoreModificato}
+          genereNuovo={genereNuovo}
+          setGenereNuovo={setGenereNuovo}
+          genereModificato={genereModificato}
+          setGenereModificato={setGenereModificato}
           ricercaTesto={ricercaTesto}
           setRicercaTesto={setRicercaTesto}
           mostraFiltri={mostraFiltri}

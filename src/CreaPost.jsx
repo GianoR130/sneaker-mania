@@ -3,8 +3,9 @@ import { supabase } from './supabase';
 
 function CreaPost({ utente, tornaAlFeed }) {
   const [descrizione, setDescrizione] = useState('');
-  const [immagineUrl, setImmagineUrl] = useState('');
   const [hashtags, setHashtags] = useState('');
+  const [immagineUrl, setImmagineUrl] = useState(''); // Per il link web (URL)
+  const [fileImmagine, setFileImmagine] = useState(null); // Per il file locale (Bucket)
   const [inCaricamento, setInCaricamento] = useState(false);
 
   const gestisciPubblicazione = async (e) => {
@@ -17,18 +18,46 @@ function CreaPost({ utente, tornaAlFeed }) {
     setInCaricamento(true);
 
     try {
+      let urlFinale = null;
+
+      // 1. Priorità al file locale: se c'è, lo carichiamo sul bucket di Supabase
+      if (fileImmagine) {
+        const nomeUnicoFile = `${Date.now()}_${fileImmagine.name}`;
+        
+        const { error: uploadError } = await supabase
+          .storage
+          .from('immagini-post')
+          .upload(nomeUnicoFile, fileImmagine);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase
+          .storage
+          .from('immagini-post')
+          .getPublicUrl(nomeUnicoFile);
+
+        urlFinale = urlData.publicUrl;
+      } 
+      // 2. Altrimenti, se l'utente ha inserito un URL testuale, usiamo direttamente quello
+      else if (immagineUrl.trim()) {
+        urlFinale = immagineUrl.trim();
+      }
+
+      // Inserimento del post nel database con l'URL corretto (da bucket o da link)
       const { error } = await supabase.from('post').insert([
         {
           user_id: utente.id,
           descrizione: descrizione,
-          immagine_url: immagineUrl || null,
+          immagine_url: urlFinale,
           hashtags: hashtags
         }
       ]);
 
       if (error) throw error;
 
+      // Reset completo di tutti i campi
       setDescrizione('');
+      setFileImmagine(null);
       setImmagineUrl('');
       setHashtags('');
       tornaAlFeed();
@@ -109,25 +138,89 @@ function CreaPost({ utente, tornaAlFeed }) {
           />
         </div>
 
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#111111' }}>
-            URL Immagine
-          </label>
-          <input
-            type="text"
-            value={immagineUrl}
-            onChange={(e) => setImmagineUrl(e.target.value)}
-            placeholder="https://..."
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1px solid #ddd',
-              boxSizing: 'border-box',
-              color: '#111111',
-              backgroundColor: '#ffffff'
-            }}
-          />
+        {/* CONTENITORE IMMAGINI: SCELTA DOPPIA COERENTE */}
+        <div style={{ 
+          border: '1px dashed #cccccc', 
+          padding: '15px', 
+          borderRadius: '10px', 
+          backgroundColor: '#fafafa', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: '15px' 
+        }}>
+          
+          {/* OPZIONE FILE DAL DISPOSITIVO */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#111111', fontSize: '14px' }}>
+              Carica dal dispositivo
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              disabled={!!immagineUrl.trim()} // Blocca se l'utente sta usando l'URL
+              onChange={(e) => setFileImmagine(e.target.files[0] || null)}
+              style={{
+                width: '100%',
+                padding: '8px',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                boxSizing: 'border-box',
+                color: '#111111',
+                backgroundColor: !!immagineUrl.trim() ? '#e9e9e9' : '#ffffff',
+                cursor: !!immagineUrl.trim() ? 'not-allowed' : 'default'
+              }}
+            />
+          </div>
+
+          <div style={{ textAlign: 'center', color: '#888888', fontSize: '12px', fontWeight: 'bold', margin: '2px 0' }}>
+            — OPPURE —
+          </div>
+
+          {/* OPZIONE LINK INTERNET */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#111111', fontSize: '14px' }}>
+              Incolla un link URL immagine
+            </label>
+            <input
+              type="text"
+              value={immagineUrl}
+              disabled={!!fileImmagine} // Blocca se l'utente ha scelto un file locale
+              onChange={(e) => setImmagineUrl(e.target.value)}
+              placeholder="https://esempio.com/immagine-scarpa.jpg"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #ddd',
+                boxSizing: 'border-box',
+                color: '#111111',
+                backgroundColor: !!fileImmagine ? '#e9e9e9' : '#ffffff',
+                cursor: !!fileImmagine ? 'not-allowed' : 'text'
+              }}
+            />
+          </div>
+
+          {/* BOTTONE RESET SELEZIONE (COMPARE SOLO SE UNA DELLE DUE È COMPILATA) */}
+          {(fileImmagine || immagineUrl.trim()) && (
+            <button
+              type="button"
+              onClick={() => { setFileImmagine(null); setImmagineUrl(''); }}
+              style={{
+                alignSelf: 'flex-end',
+                background: 'none',
+                border: 'none',
+                color: '#dc3545',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                padding: 0
+              }}
+            >
+              Resetta selezione immagine
+            </button>
+          )}
+
         </div>
 
         <button

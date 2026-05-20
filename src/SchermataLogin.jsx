@@ -1,4 +1,4 @@
-function SchermataMoLogin({ email, setEmail, password, setPassword, login, registrati }) {
+function SchermataLogin({ email, setEmail, password, setPassword, login, registrati }) {
   return (
     <div style={{
       maxWidth: '400px',
@@ -36,4 +36,4 @@ function SchermataMoLogin({ email, setEmail, password, setPassword, login, regis
   );
 }
 
-export default SchermataMoLogin;
+export default SchermataLogin;
