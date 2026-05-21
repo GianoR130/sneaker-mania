@@ -12,8 +12,31 @@ function ProfiloUtente({
   setVistaCorrente,
   containerStyle
 }) {
+  // Nascondiamo l'email mostrando solo lo username o la prima parte dell'email tagliata
+  const visualizzaNome = mioProfilo?.username || mioProfilo?.email?.split('@')[0] || utente?.email?.split('@')[0] || "Utente";
+
   return (
-    <div style={{ ...containerStyle }}>
+    <div style={{ ...containerStyle, position: 'relative' }}>
+
+      {/* ⚙️ Icona Impostazioni con margini bilanciati dai bordi */}
+      <button
+        onClick={() => setVistaCorrente('impostazioni')}
+        style={{
+          position: 'absolute',
+          top: '20px',    /* Margine dall'alto */
+          right: '20px',  /* Margine da destra */
+          background: 'none',
+          border: 'none',
+          fontSize: '26px',
+          cursor: 'pointer',
+          padding: '5px',
+          lineHeight: '1',
+          zIndex: 10
+        }}
+        title="Impostazioni Account"
+      >
+        ⚙️
+      </button>
 
       <button
         onClick={() => setVistaCorrente('social')}
@@ -34,18 +57,19 @@ function ProfiloUtente({
         ← Torna al Feed
       </button>
 
-      <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px', color: '#111111' }}>Il Tuo Profilo</h1>
+      <h1 style={{ margin: 0, fontSize: '24px', borderBottom: '1px solid #eee', paddingBottom: '15px', color: '#111111' }}>
+        Il Tuo Profilo
+      </h1>
 
       <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
-        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#28A745', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
-          {(utente?.email || mioProfilo?.username || "U").charAt(0).toUpperCase()}
+        <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
+          {visualizzaNome.charAt(0).toUpperCase()}
         </div>
+
+        {/* Mostra solo il nome utente protetto, nascondendo l'email completa */}
         <h2 style={{ margin: '0 0 5px 0', color: '#111111' }}>
-          @{mioProfilo?.username || utente?.email?.split('@')[0] || "Utente"}
+          @{visualizzaNome}
         </h2>
-        <p style={{ color: '#555555', margin: '0 0 20px 0', fontSize: '15px' }}>
-          {utente?.email}
-        </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
           <div
@@ -64,8 +88,6 @@ function ProfiloUtente({
             <span style={{ fontSize: '13px', color: '#777777' }}>Seguiti</span>
           </div>
         </div>
-
-        <button onClick={() => supabase.auth.signOut()} style={{ padding: '8px 20px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>Logout</button>
       </div>
 
       <div style={{ marginTop: '40px' }}>
@@ -77,6 +99,7 @@ function ProfiloUtente({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
             {raccolte.map(r => (
               <div key={r.id} style={{ backgroundColor: 'white', padding: '20px', borderRadius: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', position: 'relative', color: '#111111' }}>
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <span style={{ fontSize: '30px' }}>📁</span>
@@ -86,30 +109,35 @@ function ProfiloUtente({
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '10px' }}>
                     <button
-                      onClick={() => togglePrivacyRaccolta(r)}
+                      onClick={() => togglePrivacyRaccolta(r.id, r.is_public)}
                       style={{
-                        backgroundColor: r.pubblica ? '#e3f2fd' : '#f5f5f5',
-                        color: r.pubblica ? '#1976d2' : '#757575',
-                        border: '1px solid ' + (r.pubblica ? '#bbdefb' : '#ddd'),
                         padding: '6px 12px',
-                        borderRadius: '8px',
-                        fontSize: '12px',
+                        backgroundColor: r.is_public ? '#e2e3e5' : '#fff3cd',
+                        color: r.is_public ? '#383d41' : '#856404',
+                        border: '1px solid',
+                        borderColor: r.is_public ? '#d6d8db' : '#ffeeba',
+                        borderRadius: '6px',
                         cursor: 'pointer',
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        flexShrink: 0
+                        fontSize: '13px',
+                        fontWeight: 'bold'
                       }}
                     >
-                      {r.pubblica ? '🌍 Pubblica' : '🔒 Privata'}
+                      {r.is_public ? '🌍 Pubblica' : '🔒 Privata'}
                     </button>
-
                     <button
                       onClick={() => eliminaRaccolta(r.id)}
-                      style={{ backgroundColor: '#fff', color: '#dc3545', border: '1px solid #dc3545', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', flexShrink: 0 }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#f8d7da',
+                        color: '#721c24',
+                        border: '1px solid #f5c6cb',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                        fontWeight: 'bold'
+                      }}
                     >
                       Elimina
                     </button>
@@ -118,8 +146,8 @@ function ProfiloUtente({
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
                   {r.scarpe && r.scarpe.length > 0 ? (
-                    r.scarpe.map(s => (
-                      <div key={s.id} style={{ textAlign: 'center', padding: '10px', border: '1px solid #eee', borderRadius: '12px', backgroundColor: '#fafafa' }}>
+                    r.scarpe.map((s, idx) => (
+                      <div key={s.id || idx} style={{ textAlign: 'center', padding: '10px', border: '1px solid #eee', borderRadius: '12px', backgroundColor: '#fafafa' }}>
                         <div style={{ width: '100%', height: '210px', backgroundColor: '#fff', borderRadius: '8px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {s.immagine ? (
                             <img src={s.immagine} alt={s.modello} style={{ width: '100%', height: '200%', objectFit: 'contain', display: 'block' }} />
@@ -139,6 +167,7 @@ function ProfiloUtente({
                     </p>
                   )}
                 </div>
+
               </div>
             ))}
           </div>
@@ -149,6 +178,7 @@ function ProfiloUtente({
           </div>
         )}
       </div>
+
     </div>
   );
 }

@@ -6,8 +6,7 @@ import Esplora from './Esplora';
 import FeedSocial from './FeedSocial';
 import CatalogoScarpe from './CatalogoScarpe';
 import ProfiloUtente from './ProfiloUtente';
-import ProfiloAltroUtente from './ProfiloAltroUtente';
-import SchermataLogin from './SchermataLogin';
+import ProfiloAltroUtente from './ProfiloAltroUtente';import Impostazioni from './Impostazioni';import SchermataLogin from './SchermataLogin';
 import NavBar from './NavBar';
 import ModaleRelazioni from './ModaleRelazioni';
 
@@ -314,18 +313,22 @@ function MainApp() {
     }
   };
 
-  const togglePrivacyRaccolta = async (raccolta) => {
-    const nuovaPrivacy = !raccolta.pubblica;
+  const togglePrivacyRaccolta = async (idRaccolta, isPublicAttuale) => {
+    // 1. Invertiamo lo stato attuale passato dal bottone
+    const nuovaPrivacy = !isPublicAttuale;
 
+    // 2. Aggiorniamo il database usando 'pubblica' come colonna reale di Supabase
     const { error } = await supabase
       .from('raccolte_scarpe')
-      .update({ pubblica: nuovaPrivacy })
-      .eq('id', raccolta.id);
+      .update({ pubblica: nuovaPrivacy }) 
+      .eq('id', idRaccolta); 
 
     if (!error) {
-      // Aggiorna lo stato locale
+      // 3. Aggiorna lo stato locale di React.
+      // Sostituiamo sia 'pubblica' che 'is_public' per sicurezza, 
+      // così l'interfaccia si aggiornerà al 100% istantaneamente!
       setRaccolte(raccolte.map(r =>
-        r.id === raccolta.id ? { ...r, pubblica: nuovaPrivacy } : r
+        r.id === idRaccolta ? { ...r, pubblica: nuovaPrivacy, is_public: nuovaPrivacy } : r
       ));
     } else {
       alert("Errore nell'aggiornamento della privacy: " + error.message);
@@ -855,6 +858,13 @@ function MainApp() {
           togglePrivacyRaccolta={togglePrivacyRaccolta}
           setVistaCorrente={setVistaCorrente}
           containerStyle={containerStyle}
+        />
+      )}
+      {/* SCHERMATA IMPOSTAZIONI */}
+      {vistaCorrente === 'impostazioni' && (
+        <Impostazioni
+          utente={utente}
+          setVistaCorrente={setVistaCorrente}
         />
       )}
       {/* PROFILO ALTRO UTENTE */}

@@ -10,6 +10,9 @@ function ProfiloAltroUtente({
   setVistaCorrente,
   containerStyle
 }) {
+  // Generiamo il nome visualizzato prendendo lo username o la prima parte dell'email tagliata (nascondendo il dominio)
+  const visualizzaNome = profiloSelezionato?.username || profiloSelezionato?.email?.split('@')[0] || "Utente";
+
   return (
     <div style={{ ...containerStyle }}>
 
@@ -33,21 +36,20 @@ function ProfiloAltroUtente({
         </button>
         {seguitiInfo?.isFriend && (
           <span style={{ backgroundColor: '#d4edda', color: '#155724', padding: '5px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: 'bold' }}>
-            Ora siete amici
+            Ora avete amici
           </span>
         )}
       </div>
 
       <div style={{ marginTop: '30px', padding: '20px', backgroundColor: 'white', borderRadius: '15px', textAlign: 'center' }}>
         <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: '#007BFF', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '30px', fontWeight: 'bold', margin: '0 auto 15px auto' }}>
-          {(profiloSelezionato.username || profiloSelezionato.email || "U").charAt(0).toUpperCase()}
+          {visualizzaNome.charAt(0).toUpperCase()}
         </div>
-        <h2 style={{ margin: '0 0 5px 0', color: '#111111' }}>
-          @{profiloSelezionato.username || profiloSelezionato.email?.split('@')[0] || "Utente"}
+        
+        {/* Mostra esclusivamente lo username protetto eliminando l'indirizzo email in chiaro */}
+        <h2 style={{ margin: '0 0 5px 0', color: '#111111', fontSize: '22px' }}>
+          @{visualizzaNome}
         </h2>
-        <p style={{ color: '#555555', margin: '0 0 20px 0', fontSize: '15px' }}>
-          {profiloSelezionato.email}
-        </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '40px', margin: '20px 0', padding: '15px 0', borderTop: '1px solid #ddd', borderBottom: '1px solid #ddd' }}>
           <div
