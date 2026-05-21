@@ -6,7 +6,9 @@ import Esplora from './Esplora';
 import FeedSocial from './FeedSocial';
 import CatalogoScarpe from './CatalogoScarpe';
 import ProfiloUtente from './ProfiloUtente';
-import ProfiloAltroUtente from './ProfiloAltroUtente';import Impostazioni from './Impostazioni';import SchermataLogin from './SchermataLogin';
+import ProfiloAltroUtente from './ProfiloAltroUtente';
+import Impostazioni from './Impostazioni';
+import SchermataLogin from './SchermataLogin';
 import NavBar from './NavBar';
 import ModaleRelazioni from './ModaleRelazioni';
 
@@ -34,7 +36,6 @@ function MainApp() {
   const [prezzoModificato, setPrezzoModificato] = useState('');
   const [coloreModificato, setColoreModificato] = useState('');
 
-
   // --- STATI RICERCA E FILTRI ---
   const [ricercaTesto, setRicercaTesto] = useState('');
   const [mostraFiltri, setMostraFiltri] = useState(false);
@@ -43,7 +44,6 @@ function MainApp() {
   const [filtroBrand, setFiltroBrand] = useState('');
   const [filtroColore, setFiltroColore] = useState('');
 
-
   // --- STATI AUTENTICAZIONE E NAVIGAZIONE ---
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,12 +51,10 @@ function MainApp() {
 
   const [vistaCorrente, setVistaCorrente] = useState('social');
 
-
   // --- STATI FUNZIONALITÀ RACCOLTE E SALVATAGGIO ---
   const [raccolte, setRaccolte] = useState([]);
   const [scarpaSelezionata, setScarpaSelezionata] = useState(null);
   const [nomeNuovaRaccolta, setNomeNuovaRaccolta] = useState('');
-
 
   // --- STATI SOCIAL MEDIA ---
   const [posts, setPosts] = useState([]);
@@ -77,13 +75,9 @@ function MainApp() {
   const [genereNuovo, setGenereNuovo] = useState('Unisex');
   const [genereModificato, setGenereModificato] = useState('Unisex');
 
-
-
   const isAdmin = utente?.email === EMAIL_ADMIN;
 
-
   // ─── GLOBAL STYLE INJECTION ───────────────────────────────────────────────
-  // Injects a <style> tag once to override system dark-mode and fix backgrounds.
   useEffect(() => {
     const styleId = 'sneaker-global-style';
     if (document.getElementById(styleId)) return;
@@ -122,7 +116,6 @@ function MainApp() {
     `;
     document.head.appendChild(style);
 
-    // Also force the viewport meta tag for correct mobile zoom
     let viewport = document.querySelector('meta[name="viewport"]');
     if (!viewport) {
       viewport = document.createElement('meta');
@@ -131,12 +124,9 @@ function MainApp() {
     }
     viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0';
 
-    return () => {
-      // Do NOT remove on unmount — it should persist for the full session
-    };
+    return () => {};
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
-
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -149,7 +139,6 @@ function MainApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-
   // --- SCROLL IN CIMA AUTOMATICO ---
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -157,22 +146,24 @@ function MainApp() {
 
   useEffect(() => {
     if (utente?.id) {
-      // UTENTE ENTRATO (Admin o Utente normale)
       scaricaCatalogo();
-      caricaRaccolte(utente.id); // Passiamo l'ID direttamente per sicurezza
+      caricaRaccolte(utente.id);
       scaricaPosts();
       caricaMioProfilo(utente.id);
     } else {
-      // UTENTE USCITO (Logout)
       setRaccolte([]);
       setMioProfilo(null);
       setMieRelazioni({ followers: 0, following: 0 });
       console.log("Stati svuotati post-logout");
     }
-  }, [utente]); // React reagisce ogni volta che 'utente' cambia
+  }, [utente]);
 
-
-
+  const cambiaSchermata = (nuovaVista) => {
+    if (nuovaVista === 'profilo' || nuovaVista === 'profilo_altro_utente') {
+      setRaccolte([]); // Svuota lo stato residuo prima del cambio schermata
+    }
+    setVistaCorrente(nuovaVista);
+  };
 
   const caricaMioProfilo = async (userId) => {
     const { data } = await supabase.from('profili').select('*').eq('id', userId).single();
@@ -182,7 +173,6 @@ function MainApp() {
     const { count: following } = await supabase.from('seguiti').select('*', { count: 'exact', head: true }).eq('follower_id', userId);
     setMieRelazioni({ followers: followers || 0, following: following || 0 });
   };
-
 
   const caricaRelazioniProfilo = async (targetUserId) => {
     const { count: followersCount } = await supabase.from('seguiti').select('*', { count: 'exact', head: true }).eq('following_id', targetUserId);
@@ -199,15 +189,12 @@ function MainApp() {
   };
 
   const apriListaRelazioni = async (userId, tipo) => {
-    // Apri subito il modale in stato di caricamento
     setModaleRelazioni({ visibile: true, titolo: 'Caricamento...', utenti: [] });
 
     try {
-      // 1. Definisci cosa stiamo cercando
       const colonnaFiltro = tipo === 'follower' ? 'following_id' : 'follower_id';
       const colonnaTarget = tipo === 'follower' ? 'follower_id' : 'following_id';
 
-      // 2. Trova le relazioni in database
       const { data: relazioni } = await supabase
         .from('seguiti')
         .select('*')
@@ -218,7 +205,6 @@ function MainApp() {
         return;
       }
 
-      // 3. Estrai gli ID e cerca i profili associati
       const ids = relazioni.map(r => r[colonnaTarget]);
 
       const { data: profili } = await supabase
@@ -226,7 +212,6 @@ function MainApp() {
         .select('id, username, email')
         .in('id', ids);
 
-      // Mostra i risultati
       setModaleRelazioni({
         visibile: true,
         titolo: tipo === 'follower' ? 'Follower' : 'Seguiti',
@@ -238,7 +223,6 @@ function MainApp() {
       setModaleRelazioni({ visibile: false, titolo: '', utenti: [] });
     }
   };
-
 
   const toggleSegui = async (targetUserId) => {
     if (targetUserId === utente.id) return;
@@ -269,12 +253,13 @@ function MainApp() {
     }
   };
 
-
   const apriProfiloUtente = async (userId, nomeUtente, emailUtente) => {
+    // Svuotiamo le raccolte per evitare di vedere le vecchie
+    setRaccolte([]);
+
     // 1. Controllo se è il mio profilo
     if (userId === utente.id) {
       setVistaCorrente('profilo');
-      // Opzionale: ricarica le tue raccolte (comprese le private)
       caricaRaccolte(utente.id);
       return;
     }
@@ -287,15 +272,12 @@ function MainApp() {
     });
 
     // 3. Prepariamo l'interfaccia
-    setRaccolte([]); // Svuota per evitare dati vecchi
     setVistaCorrente('profilo_altro_utente');
 
     // 4. Carichiamo relazioni e raccolte in parallelo
     caricaRelazioniProfilo(userId);
 
     try {
-      // NOTA: Usiamo '*, scarpe(*)' se hai una tabella relazionata, 
-      // altrimenti '*' va bene se i dati sono nella stessa riga.
       const { data, error } = await supabase
         .from('raccolte_scarpe')
         .select('*')
@@ -305,7 +287,7 @@ function MainApp() {
 
       if (error) throw error;
 
-      console.log("Raccolte pubbliche trovate:", data); // Per debug
+      console.log("Raccolte pubbliche trovate:", data);
       setRaccolte(data || []);
 
     } catch (error) {
@@ -314,19 +296,14 @@ function MainApp() {
   };
 
   const togglePrivacyRaccolta = async (idRaccolta, isPublicAttuale) => {
-    // 1. Invertiamo lo stato attuale passato dal bottone
     const nuovaPrivacy = !isPublicAttuale;
 
-    // 2. Aggiorniamo il database usando 'pubblica' come colonna reale di Supabase
     const { error } = await supabase
       .from('raccolte_scarpe')
       .update({ pubblica: nuovaPrivacy }) 
       .eq('id', idRaccolta); 
 
     if (!error) {
-      // 3. Aggiorna lo stato locale di React.
-      // Sostituiamo sia 'pubblica' che 'is_public' per sicurezza, 
-      // così l'interfaccia si aggiornerà al 100% istantaneamente!
       setRaccolte(raccolte.map(r =>
         r.id === idRaccolta ? { ...r, pubblica: nuovaPrivacy, is_public: nuovaPrivacy } : r
       ));
@@ -334,8 +311,6 @@ function MainApp() {
       alert("Errore nell'aggiornamento della privacy: " + error.message);
     }
   };
-
-
 
   const scaricaPosts = async () => {
     const { data, error } = await supabase
@@ -354,7 +329,6 @@ function MainApp() {
       console.error("Errore download post:", error);
     }
   };
-
 
   const toggleMiPiace = async (postId) => {
     const postCorrente = posts.find(p => p.id === postId);
@@ -382,9 +356,8 @@ function MainApp() {
 
   const gestisciClickHashtag = (tag) => {
     setQueryRicerca(tag);
-    setVistaCorrente('cerca');
+    cambiaSchermata('cerca');
   };
-
 
   const aggiungiCommento = async (postId) => {
     if (!commentoTesto.trim()) return;
@@ -403,7 +376,6 @@ function MainApp() {
     }
   };
 
-
   const eliminaCommento = async (commentoId) => {
     if (!window.confirm("Sei sicuro di voler eliminare questo commento?")) return;
 
@@ -419,11 +391,7 @@ function MainApp() {
     }
   };
 
-
-
-
   const caricaRaccolte = async (idDaCercare) => {
-    // Se non passiamo un ID, usiamo quello dell'utente loggato come fallback
     const id = idDaCercare || utente?.id;
 
     if (!id) {
@@ -433,7 +401,7 @@ function MainApp() {
 
     const { data, error } = await supabase
       .from('raccolte_scarpe')
-      .select('*') // <-- ECCO IL FIX: rimosso scarpe(*) che mandava in tilt Supabase!
+      .select('*')
       .eq('user_id', id)
       .order('nome_raccolta');
 
@@ -444,7 +412,6 @@ function MainApp() {
       setRaccolte([]);
     }
   };
-
 
   const toggleScarpaInRaccolta = async (idRaccolta, scarpaObj) => {
     const raccoltaEsistente = raccolte.find(r => r.id === idRaccolta);
@@ -469,7 +436,6 @@ function MainApp() {
     }
   };
 
-
   const creaRaccolta = async () => {
     if (!nomeNuovaRaccolta.trim()) return;
 
@@ -491,7 +457,6 @@ function MainApp() {
     }
   };
 
-
   const eliminaRaccolta = async (idRaccolta) => {
     const conferma = window.confirm("Sei sicuro di voler eliminare questa raccolta?");
     if (!conferma) return;
@@ -505,7 +470,6 @@ function MainApp() {
     }
   };
 
-
   const scaricaCatalogo = async () => {
     setInCaricamento(true);
     const { data, error } = await supabase.from('scarpe').select('*').order('id', { ascending: true });
@@ -513,7 +477,6 @@ function MainApp() {
     else setDatiScarpe(data);
     setInCaricamento(false);
   };
-
 
   const aggiungiScarpa = async (e) => {
     e.preventDefault();
@@ -526,7 +489,7 @@ function MainApp() {
         modello: nuovoModello,
         prezzo: nuovoPrezzo,
         colore: nuovoColore,
-        genere: genereNuovo, // ➕ Invia il genere selezionato a Supabase
+        genere: genereNuovo,
         user_id: utente.id
       }
     ]);
@@ -538,12 +501,11 @@ function MainApp() {
         setNuovoModello('');
         setNuovoPrezzo('');
         setNuovoColore('');
-        setGenereNuovo('Unisex'); // ➕ Resetta la tendina sul valore di default
+        setGenereNuovo('Unisex');
       }
       scaricaCatalogo();
     }
   };
-
 
   const eliminaScarpa = async (idScarpa) => {
     if (!isAdmin) return;
@@ -553,7 +515,6 @@ function MainApp() {
     else setDatiScarpe(datiScarpe.filter(s => s.id !== idScarpa));
   };
 
-
   const avviaModifica = (scarpa) => {
     setIdInModifica(scarpa.id);
     setBrandModificato(scarpa.brand);
@@ -562,7 +523,6 @@ function MainApp() {
     setColoreModificato(scarpa.colore || '');
     setGenereModificato(scarpa.genere || 'Unisex');
   };
-
 
   const salvaModifica = async (idScarpa) => {
     const { error } = await supabase
@@ -583,7 +543,6 @@ function MainApp() {
     }
   };
 
-
   const inserisciImmagine = async (idScarpa) => {
     if (!isAdmin) return;
     const urlImmagine = window.prompt("Incolla qui l'URL (link) dell'immagine della scarpa:");
@@ -594,7 +553,6 @@ function MainApp() {
     else scaricaCatalogo();
   };
 
-
   const rimuoviImmagine = async (e, idScarpa) => {
     e.stopPropagation();
     if (!isAdmin) return;
@@ -604,7 +562,6 @@ function MainApp() {
     if (error) alert("Errore durante la rimozione dell'immagine: " + error.message);
     else scaricaCatalogo();
   };
-
 
   const gestisciImportazioneCSV = (e) => {
     const file = e.target.files[0];
@@ -635,9 +592,6 @@ function MainApp() {
     });
   };
 
-
-
-
   const scarpeFiltrate = datiScarpe.filter((scarpa) => {
     const matchTesto = `${scarpa.brand} ${scarpa.modello}`.toLowerCase().includes(ricercaTesto.toLowerCase());
     const matchMin = filtroPrezzoMin === '' || scarpa.prezzo >= Number(filtroPrezzoMin);
@@ -648,9 +602,7 @@ function MainApp() {
     return matchTesto && matchMin && matchMax && matchBrand && matchColore;
   });
 
-
   const brandUnici = [...new Set(datiScarpe.map(s => s.brand).filter(Boolean))];
-
 
   const registrati = async (e) => {
     e.preventDefault();
@@ -659,19 +611,17 @@ function MainApp() {
     else alert('Registrazione completata!');
   };
 
-
   const login = async (e) => {
     e.preventDefault();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) alert("Errore: " + error.message);
   };
 
-
   const logout = async () => {
     setRaccolte([]);
     setMioProfilo(null);
     await supabase.auth.signOut();
-    setVistaCorrente('social');
+    cambiaSchermata('social');
   };
 
   // --- SCHERMATA DI LOGIN ---
@@ -688,13 +638,11 @@ function MainApp() {
     );
   }
 
-
-  // Shared styles — explicit colors on every container so dark mode can't bleed in
   const containerStyle = {
     maxWidth: '900px',
-    width: '100%',           // was min(95vw,900px) which could cause horizontal scroll on some phones
+    width: '100%',
     margin: '0 auto 50px auto',
-    padding: '20px',         // reduced from 30px to avoid overflow on small screens
+    padding: '20px',
     borderRadius: '12px',
     boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
     fontFamily: 'sans-serif',
@@ -702,9 +650,7 @@ function MainApp() {
     color: '#111111'
   };
 
-
   return (
-    // PAGE WRAPPER: explicit bg + color so it's always light regardless of OS dark mode
     <div style={{
       minHeight: '100vh',
       width: '100%',
@@ -751,7 +697,7 @@ function MainApp() {
         <CreaPost
           utente={utente}
           tornaAlFeed={() => {
-            setVistaCorrente('social');
+            cambiaSchermata('social');
             scaricaPosts();
           }}
         />
@@ -856,7 +802,7 @@ function MainApp() {
           apriListaRelazioni={apriListaRelazioni}
           eliminaRaccolta={eliminaRaccolta}
           togglePrivacyRaccolta={togglePrivacyRaccolta}
-          setVistaCorrente={setVistaCorrente}
+          setVistaCorrente={cambiaSchermata}
           containerStyle={containerStyle}
         />
       )}
@@ -864,7 +810,8 @@ function MainApp() {
       {vistaCorrente === 'impostazioni' && (
         <Impostazioni
           utente={utente}
-          setVistaCorrente={setVistaCorrente}
+          setVistaCorrente={cambiaSchermata}
+          containerStyle={containerStyle}
         />
       )}
       {/* PROFILO ALTRO UTENTE */}
@@ -876,13 +823,13 @@ function MainApp() {
           utente={utente}
           toggleSegui={toggleSegui}
           apriListaRelazioni={apriListaRelazioni}
-          setVistaCorrente={setVistaCorrente}
+          setVistaCorrente={cambiaSchermata}
           containerStyle={containerStyle}
         />
       )}
       <NavBar
         vistaCorrente={vistaCorrente}
-        setVistaCorrente={setVistaCorrente}
+        setVistaCorrente={cambiaSchermata}
         setQueryRicerca={setQueryRicerca}
       />
 
@@ -892,7 +839,7 @@ function MainApp() {
         apriProfiloUtente={apriProfiloUtente}
       />
 
-    </div> /* fine contenitore principale app */
+    </div>
   );
 }
 
