@@ -12,6 +12,7 @@ import SchermataLogin from './SchermataLogin';
 import NavBar from './NavBar';
 import ModaleRelazioni from './ModaleRelazioni';
 import Attivita from './Attivita';
+import ChatSingola from './ChatSingola';
 
 function MainApp() {
   // --- IMPOSTAZIONI ADMIN ---
@@ -61,6 +62,9 @@ function MainApp() {
   const [posts, setPosts] = useState([]);
   const [postInCommento, setPostInCommento] = useState(null);
   const [commentoTesto, setCommentoTesto] = useState('');
+
+  const [chatAttiva, setChatAttiva] = useState(null);
+  const [conversazioni, setConversazioni] = useState([]);
 
   // --- STATI PER I PROFILI E FOLLOWER ---
   const [profiloSelezionato, setProfiloSelezionato] = useState({ id: null, username: '' });
@@ -164,6 +168,58 @@ function MainApp() {
       setRaccolte([]); // Svuota lo stato residuo prima del cambio schermata
     }
     setVistaCorrente(nuovaVista);
+  };
+
+  const avviaChat = async (targetUserId, targetUsername, targetEmail) => {
+    if (!utente?.id || !targetUserId) return;
+
+    const { data: conversazioneEsistente, error: erroreRicerca } = await supabase
+      .from('conversazioni')
+      .select('*')
+      .or(`and(user1_id.eq.${utente.id},user2_id.eq.${targetUserId}),and(user1_id.eq.${targetUserId},user2_id.eq.${utente.id})`)
+      .limit(1)
+      .single();
+
+    if (erroreRicerca && erroreRicerca.code !== 'PGRST116') {
+      console.error('Errore ricerca conversazione:', erroreRicerca.message || erroreRicerca);
+      return;
+    }
+
+    let conversazioneSelezionata = conversazioneEsistente;
+
+    if (!conversazioneEsistente) {
+      const { data: nuovaConversazione, error: erroreCreazione } = await supabase
+        .from('conversazioni')
+        .insert([
+          {
+            user1_id: utente.id,
+            user2_id: targetUserId
+          }
+        ])
+        .select()
+        .single();
+
+      if (erroreCreazione) {
+        console.error('Errore creazione conversazione:', erroreCreazione.message || erroreCreazione);
+        return;
+      }
+
+      conversazioneSelezionata = nuovaConversazione;
+    }
+
+    const chatObj = {
+      ...conversazioneSelezionata,
+      targetUserId,
+      targetUsername,
+      targetEmail
+    };
+
+    setChatAttiva(chatObj);
+    setConversazioni((prev) => {
+      if (prev.some((item) => item.id === chatObj.id)) return prev;
+      return [...prev, chatObj];
+    });
+    setVistaCorrente('chat_singola');
   };
 
   const caricaMioProfilo = async (userId) => {
@@ -734,7 +790,18 @@ function MainApp() {
       {/* VISTA ATTIVITÀ */}
       {vistaCorrente === 'attivita' && (
         <Attivita
+          utente={utente}
+          avviaChat={avviaChat}
           containerStyle={containerStyle}
+        />
+      )}
+
+      {/* VISTA CHAT SINGOLA */}
+      {vistaCorrente === 'chat_singola' && (
+        <ChatSingola
+          conversazione={chatAttiva}
+          utente={utente}
+          setVistaCorrente={cambiaSchermata}
         />
       )}
 
@@ -831,6 +898,7 @@ function MainApp() {
           toggleSegui={toggleSegui}
           apriListaRelazioni={apriListaRelazioni}
           setVistaCorrente={cambiaSchermata}
+          avviaChat={avviaChat}
           containerStyle={containerStyle}
         />
       )}

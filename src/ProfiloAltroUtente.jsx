@@ -8,6 +8,7 @@ function ProfiloAltroUtente({
   toggleSegui,
   apriListaRelazioni,
   setVistaCorrente,
+  avviaChat,
   containerStyle
 }) {
   // Generiamo il nome visualizzato prendendo lo username o la prima parte dell'email tagliata (nascondendo il dominio)
@@ -69,21 +70,39 @@ function ProfiloAltroUtente({
           </div>
         </div>
 
-        <button
-          onClick={() => toggleSegui(profiloSelezionato.id)}
-          style={{
-            padding: '10px 30px',
-            borderRadius: '25px',
-            border: 'none',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            backgroundColor: seguitiInfo?.isFollowing ? '#e9ecef' : '#111111',
-            color: seguitiInfo?.isFollowing ? '#111111' : '#ffffff',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          {seguitiInfo?.isFollowing ? 'Smetti di seguire' : seguitiInfo?.miSegue ? 'Segui anche tu' : 'Segui'}
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '20px' }}>
+          <button
+            onClick={() => toggleSegui(profiloSelezionato.id)}
+            style={{
+              padding: '10px 30px',
+              borderRadius: '25px',
+              border: 'none',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              backgroundColor: seguitiInfo?.isFollowing ? '#e9ecef' : '#111111',
+              color: seguitiInfo?.isFollowing ? '#111111' : '#ffffff',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {seguitiInfo?.isFollowing ? 'Smetti di seguire' : seguitiInfo?.miSegue ? 'Segui anche tu' : 'Segui'}
+          </button>
+
+          <button
+            onClick={() => avviaChat(profiloSelezionato.id, profiloSelezionato.username, profiloSelezionato.email)}
+            style={{
+              padding: '10px 30px',
+              borderRadius: '25px',
+              border: 'none',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              backgroundColor: '#007BFF',
+              color: '#ffffff',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Messaggia
+          </button>
+        </div>
       </div>
 
       <div style={{ marginTop: '40px' }}>
