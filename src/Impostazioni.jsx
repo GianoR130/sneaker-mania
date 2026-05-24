@@ -51,83 +51,69 @@ function Impostazioni({ utente, setVistaCorrente, containerStyle }) {
   };
 
   return (
-    // Il minHeight: 100vh blocca il salto della navbar tenendo viva la scrollbar
-    <div style={{ ...containerStyle, minHeight: '100vh' }}>
+    // Usiamo DIRETTAMENTE containerStyle come unica scheda bianca
+    // Ho aggiunto minHeight: '60vh' per dare un po' di spazio vuoto sotto ed estendere la scheda
+    <div style={{ ...containerStyle, minHeight: '60vh', display: 'flex', flexDirection: 'column' }}>
       
-      {/* Scheda bianca con larghezza bloccata e centrata */}
+      {/* Header della Scheda */}
       <div style={{ 
-        maxWidth: '500px',   /* ⬅️ CAMBIA QUESTO VALORE SE NON COMBACIA ESATTAMENTE CON L'HEADER */
-        margin: '30px auto', /* Centra orizzontalmente la scheda nella pagina */
-        backgroundColor: 'white', 
-        borderRadius: '15px', 
-        padding: '20px',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-        minHeight: '400px', 
-        display: 'flex',
-        flexDirection: 'column'
+        position: 'relative', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        borderBottom: '1px solid #eee', 
+        paddingBottom: '15px' 
       }}>
         
-        {/* Header della Scheda */}
-        <div style={{ 
-          position: 'relative', 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center',
-          borderBottom: '1px solid #eee', 
-          paddingBottom: '15px' 
-        }}>
-          
-          {/* Pulsante Indietro agganciato a sinistra */}
-          <button
-            onClick={() => setVistaCorrente('profilo')}
-            style={{
-              position: 'absolute',
-              left: '0', 
-              padding: '8px 12px',
-              background: '#f0f2f5',
-              border: 'none',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              color: '#111111',
-              fontWeight: 'bold',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px'
-            }}
-          >
-            ← Torna al Profilo
-          </button>
-          
-          <h1 style={{ margin: 0, fontSize: '20px', color: '#111111', textAlign: 'center' }}>
-            Impostazioni Account
-          </h1>
-
-        </div>
-
-        {/* Contenuto principale */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
-          
-          <button
-            onClick={gestisciEliminazione}
-            disabled={inCaricamento}
-            style={{
-              padding: '12px 30px',
-              backgroundColor: inCaricamento ? '#ccc' : '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '25px',
-              fontWeight: 'bold',
-              cursor: inCaricamento ? 'not-allowed' : 'pointer',
-              fontSize: '15px',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            {inCaricamento ? "Eliminazione in corso..." : "Elimina definitivamente l'account"}
-          </button>
-        </div>
+        {/* Pulsante Indietro agganciato a sinistra */}
+        <button
+          onClick={() => setVistaCorrente('profilo')}
+          style={{
+            position: 'absolute',
+            left: '0', 
+            padding: '8px 12px',
+            background: '#f0f2f5',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: '#111111',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px'
+          }}
+        >
+          ← Torna al Profilo
+        </button>
         
+        <h1 style={{ margin: 0, fontSize: '20px', color: '#111111', textAlign: 'center' }}>
+          Impostazioni Account
+        </h1>
+
       </div>
-      
+
+      {/* Contenuto principale centrato all'interno della grande scheda */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginTop: '40px', marginBottom: '40px' }}>
+        
+        <button
+          onClick={gestisciEliminazione}
+          disabled={inCaricamento}
+          style={{
+            padding: '12px 30px',
+            backgroundColor: inCaricamento ? '#ccc' : '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '25px',
+            fontWeight: 'bold',
+            cursor: inCaricamento ? 'not-allowed' : 'pointer',
+            fontSize: '15px',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          {inCaricamento ? "Eliminazione in corso..." : "Elimina definitivamente l'account"}
+        </button>
+      </div>
+        
     </div>
   );
 }

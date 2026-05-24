@@ -11,6 +11,7 @@ import Impostazioni from './Impostazioni';
 import SchermataLogin from './SchermataLogin';
 import NavBar from './NavBar';
 import ModaleRelazioni from './ModaleRelazioni';
+import Attivita from './Attivita';
 
 function MainApp() {
   // --- IMPOSTAZIONI ADMIN ---
@@ -728,6 +729,12 @@ function MainApp() {
           queryIniziale={queryRicerca}
           utente={utente}
           alClickProfilo={apriProfiloUtente}
+        />
+      )}
+      {/* VISTA ATTIVITÀ */}
+      {vistaCorrente === 'attivita' && (
+        <Attivita
+          containerStyle={containerStyle}
         />
       )}
 

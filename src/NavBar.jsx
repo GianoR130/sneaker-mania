@@ -60,15 +60,18 @@ function NavBar({ vistaCorrente, setVistaCorrente, setQueryRicerca }) {
         <button
           onClick={() => {
             setQueryRicerca("");
-            setVistaCorrente('cerca');
+            setVistaCorrente('attivita');
           }}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'cerca' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', color: vistaCorrente === 'attivita' ? '#111111' : '#aaaaaa', padding: '4px 8px', flex: 1 }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+            <line x1="6" y1="1" x2="6" y2="4"></line>
+            <line x1="10" y1="1" x2="10" y2="4"></line>
+            <line x1="14" y1="1" x2="14" y2="4"></line>
           </svg>
-          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'cerca' ? 'bold' : 'normal' }}>Cerca</span>
+          <span style={{ fontSize: '10px', marginTop: '4px', fontWeight: vistaCorrente === 'attivita' ? 'bold' : 'normal' }}>Attività</span>
         </button>
 
         <button

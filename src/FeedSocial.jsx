@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 function FeedSocial({
   posts,
@@ -16,20 +16,117 @@ function FeedSocial({
   gestisciClickHashtag,
   containerStyle
 }) {
+  // Stati locali per i filtri e l'ordinamento
+  const [criterioOrdine, setCriterioOrdine] = useState('recenti');
+  const [criterioFiltro, setCriterioFiltro] = useState('tutto');
+
+  // Stile condiviso per i dropdown per mantenere l'interfaccia elegante
+  const stileSelect = {
+    padding: '8px 12px',
+    borderRadius: '8px',
+    border: '1px solid #ccc',
+    backgroundColor: '#ffffff',
+    color: '#111111',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+  };
+
+  // 1. FILTRIAMO i post in base al tipo di contenuto
+  const postsFiltrati = posts.filter(post => {
+    if (criterioFiltro === 'immagini') {
+      return !!post.immagine_url; 
+    }
+    if (criterioFiltro === 'testo') {
+      return !post.immagine_url; 
+    }
+    return true; // 'tutto'
+  });
+
+  // 2. ORIDINIAMO i post filtrati in base al criterio selezionato
+  const postsOrdinati = [...postsFiltrati].sort((a, b) => {
+    if (criterioOrdine === 'popolari') {
+      return (b.post_likes?.length || 0) - (a.post_likes?.length || 0);
+    }
+    if (criterioOrdine === 'commentati') {
+      return (b.post_commenti?.length || 0) - (a.post_commenti?.length || 0);
+    }
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
   return (
     <div style={containerStyle}>
+      
+      {/* --- HEADER DELLA PAGINA --- */}
       <div style={{ borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0, fontSize: '28px', color: '#111111' }}>Il tuo Feed</h1>
-        <p style={{ margin: '5px 0 0 0', color: '#555555' }}>Scopri le ultime tendenze e i post degli utenti.</p>
-      </div>
+        
+        {/* Titolo e Sottotitolo perfettamente centrati */}
+        <div style={{ position: 'relative', textAlign: 'center', marginBottom: '20px' }}>
+          <h1 style={{ margin: 0, fontSize: '28px', color: '#111111' }}>Il tuo Feed</h1>
+          <p style={{ margin: '5px 0 0 0', color: '#555555' }}>Scopri le ultime tendenze e i post degli utenti.</p>
+          <div
+            onClick={() => gestisciClickHashtag('')}
+            style={{
+              position: 'absolute',
+              top: '0',
+              right: '0',
+              cursor: 'pointer',
+              padding: '4px',
+              color: '#111111'
+            }}
+            title="Cerca"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </div>
+        </div>
 
-      {posts.length === 0 ? (
-        <p style={{ textAlign: 'center', color: '#777777', marginTop: '30px' }}>Nessun post da mostrare. Aggiungine uno!</p>
+        {/* Riga dei filtri: Contenuto a sinistra, Ordinamento a destra */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          
+          {/* Dropdown Filtro (A SINISTRA) */}
+          <select
+            value={criterioFiltro}
+            onChange={(e) => setCriterioFiltro(e.target.value)}
+            style={stileSelect}
+          >
+            <option value="tutto">📱 Tutto</option>
+            <option value="immagini">🖼️ Solo immagini</option>
+            <option value="testo">📝 Solo testo</option>
+          </select>
+
+          {/* Dropdown Ordinamento (A DESTRA) */}
+          <select
+            value={criterioOrdine}
+            onChange={(e) => setCriterioOrdine(e.target.value)}
+            style={stileSelect}
+          >
+            <option value="recenti">📅 Recenti</option>
+            <option value="popolari">🔥 Popolari</option>
+            <option value="commentati">💬 Più commentati</option>
+          </select>
+
+        </div>
+      </div>
+      {/* --- FINE HEADER --- */}
+
+      {/* Lista dei post */}
+      {postsOrdinati.length === 0 ? (
+        <p style={{ textAlign: 'center', color: '#777777', marginTop: '30px' }}>
+          {criterioFiltro !== 'tutto' 
+            ? "Nessun post corrisponde al filtro selezionato." 
+            : "Nessun post da mostrare. Aggiungine uno!"}
+        </p>
       ) : (
-        posts.map(post => {
-          const haMessoMiPiace = post.post_likes.some(like => like.user_id === utente.id);
-          const numeroMiPiace = post.post_likes.length;
-          const numeroCommenti = post.post_commenti.length;
+        postsOrdinati.map(post => {
+          const haMessoMiPiace = post.post_likes?.some(like => like.user_id === utente.id) || false;
+          const numeroMiPiace = post.post_likes?.length || 0;
+          const numeroCommenti = post.post_commenti?.length || 0;
 
           const emailAutore = post.profili?.email || "utente@anonimo.it";
           const nomeUtenteCorto = emailAutore.split('@')[0];
