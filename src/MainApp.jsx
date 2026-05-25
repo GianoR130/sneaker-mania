@@ -65,6 +65,7 @@ function MainApp() {
 
   const [chatAttiva, setChatAttiva] = useState(null);
   const [conversazioni, setConversazioni] = useState([]);
+  const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
 
   // --- STATI PER I PROFILI E FOLLOWER ---
   const [profiloSelezionato, setProfiloSelezionato] = useState({ id: null, username: '' });
@@ -161,12 +162,36 @@ function MainApp() {
       setMieRelazioni({ followers: 0, following: 0 });
       console.log("Stati svuotati post-logout");
     }
-  }, [utente]);
+  }, [utente?.id]);
+
+  useEffect(() => {
+    if (!utente?.id) {
+      setMessaggiNonLetti(0);
+      return;
+    }
+
+    conteggiaMessaggiNonLetti();
+
+    const channel = supabase
+      .channel('notifiche-messaggi-globali')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messaggi' }, (payload) => {
+        if (payload.new?.mittente_id !== utente.id) {
+          conteggiaMessaggiNonLetti();
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messaggi' }, () => {
+        conteggiaMessaggiNonLetti();
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [utente?.id]);
 
   const cambiaSchermata = (nuovaVista) => {
-    if (nuovaVista === 'profilo' || nuovaVista === 'profilo_altro_utente') {
-      setRaccolte([]); // Svuota lo stato residuo prima del cambio schermata
-    }
+    // Non svuotare immediatamente le raccolte: manteniamo lo stato locale
+    // e carichiamo/aggiorniamo quando necessario per evitare flicker.
     setVistaCorrente(nuovaVista);
   };
 
@@ -219,7 +244,8 @@ function MainApp() {
       if (prev.some((item) => item.id === chatObj.id)) return prev;
       return [...prev, chatObj];
     });
-    setVistaCorrente('chat_singola');
+    segnaMessaggiComeLetti(conversazioneSelezionata.id);
+    setVistaCorrente('chat');
   };
 
   const caricaMioProfilo = async (userId) => {
@@ -229,6 +255,63 @@ function MainApp() {
     const { count: followers } = await supabase.from('seguiti').select('*', { count: 'exact', head: true }).eq('following_id', userId);
     const { count: following } = await supabase.from('seguiti').select('*', { count: 'exact', head: true }).eq('follower_id', userId);
     setMieRelazioni({ followers: followers || 0, following: following || 0 });
+  };
+
+  const conteggiaMessaggiNonLetti = async () => {
+    if (!utente?.id) {
+      setMessaggiNonLetti(0);
+      return;
+    }
+
+    const { data: conversazioniUtente, error: conversazioniError } = await supabase
+      .from('conversazioni')
+      .select('id')
+      .or(`user1_id.eq.${utente.id},user2_id.eq.${utente.id}`);
+
+    if (conversazioniError) {
+      console.error('Errore conteggio conversazioni:', conversazioniError.message || conversazioniError);
+      setMessaggiNonLetti(0);
+      return;
+    }
+
+    const conversazioneIds = (conversazioniUtente || []).map((item) => item.id);
+    if (conversazioneIds.length === 0) {
+      setMessaggiNonLetti(0);
+      return;
+    }
+
+    const { count, error: countError } = await supabase
+      .from('messaggi')
+      .select('*', { count: 'exact', head: true })
+      .eq('letto', false)
+      .neq('mittente_id', utente.id)
+      .in('conversazione_id', conversazioneIds);
+
+    if (countError) {
+      console.error('Errore conteggio messaggi non letti:', countError.message || countError);
+      setMessaggiNonLetti(0);
+      return;
+    }
+
+    setMessaggiNonLetti(count || 0);
+  };
+
+  const segnaMessaggiComeLetti = async (conversazioneId) => {
+    if (!utente?.id || !conversazioneId) return;
+
+    const { error } = await supabase
+      .from('messaggi')
+      .update({ letto: true })
+      .eq('conversazione_id', conversazioneId)
+      .neq('mittente_id', utente.id)
+      .eq('letto', false);
+
+    if (error) {
+      console.error('Errore segnatura messaggi come letti:', error.message || error);
+      return;
+    }
+
+    conteggiaMessaggiNonLetti();
   };
 
   const caricaRelazioniProfilo = async (targetUserId) => {
@@ -355,17 +438,26 @@ function MainApp() {
   const togglePrivacyRaccolta = async (idRaccolta, isPublicAttuale) => {
     const nuovaPrivacy = !isPublicAttuale;
 
-    const { error } = await supabase
-      .from('raccolte_scarpe')
-      .update({ pubblica: nuovaPrivacy }) 
-      .eq('id', idRaccolta); 
+    try {
+      // Uso .select().single() per ottenere la raccolta aggiornata dal DB
+      const { data, error } = await supabase
+        .from('raccolte_scarpe')
+        .update({ pubblica: nuovaPrivacy })
+        .eq('id', idRaccolta)
+        .select()
+        .single();
 
-    if (!error) {
-      setRaccolte(raccolte.map(r =>
-        r.id === idRaccolta ? { ...r, pubblica: nuovaPrivacy, is_public: nuovaPrivacy } : r
-      ));
-    } else {
-      alert("Errore nell'aggiornamento della privacy: " + error.message);
+      if (error) {
+        console.error('Errore salvataggio privacy:', error);
+        alert('Errore del server durante l\'aggiornamento della privacy');
+        return;
+      }
+
+      // Aggiorniamo lo stato in modo immutabile basandoci sul valore precedente
+      setRaccolte((prev) => prev.map(r => r.id === idRaccolta ? { ...r, pubblica: data?.pubblica ?? nuovaPrivacy, is_public: data?.pubblica ?? nuovaPrivacy } : r));
+    } catch (err) {
+      console.error('Eccezione togglePrivacyRaccolta:', err);
+      alert('Errore del server');
     }
   };
 
@@ -474,39 +566,48 @@ function MainApp() {
     const raccoltaEsistente = raccolte.find(r => r.id === idRaccolta);
     if (!raccoltaEsistente) return;
 
-    const presente = raccoltaEsistente.scarpe.some(s => s.id === scarpaObj.id);
+    const presente = (raccoltaEsistente.scarpe || []).some(s => s.id === scarpaObj.id);
 
     const scarpeAggiornate = presente
-      ? raccoltaEsistente.scarpe.filter(s => s.id !== scarpaObj.id)
-      : [...raccoltaEsistente.scarpe, scarpaObj];
+      ? (raccoltaEsistente.scarpe || []).filter(s => s.id !== scarpaObj.id)
+      : [...(raccoltaEsistente.scarpe || []), scarpaObj];
 
-    const { data, error } = await supabase
-      .from('raccolte_scarpe')
-      .update({ scarpe: scarpeAggiornate })
-      .eq('id', idRaccolta)
-      .select();
+    try {
+      const { data, error } = await supabase
+        .from('raccolte_scarpe')
+        .update({ scarpe: scarpeAggiornate })
+        .eq('id', idRaccolta)
+        .select();
 
-    if (!error && data) {
-      setRaccolte(raccolte.map(r => r.id === idRaccolta ? data[0] : r));
-    } else {
-      console.error("Errore salvataggio:", error);
+      if (error) {
+        console.error('Errore salvataggio scarpe in raccolta:', error);
+        alert('Errore del server durante l\'aggiornamento della raccolta');
+        return;
+      }
+
+      const updated = Array.isArray(data) ? data[0] : data;
+      setRaccolte(prev => prev.map(r => r.id === idRaccolta ? (updated || { ...r, scarpe: scarpeAggiornate }) : r));
+    } catch (err) {
+      console.error('Eccezione toggleScarpaInRaccolta:', err);
+      alert('Errore del server');
     }
   };
 
   const creaRaccolta = async () => {
     if (!nomeNuovaRaccolta.trim()) return;
+    if (!utente?.id) return alert('Utente non autenticato');
 
     const { data, error } = await supabase
       .from('raccolte_scarpe')
       .insert([{
-        user_id: utente.id,
+        user_id: utente?.id,
         nome_raccolta: nomeNuovaRaccolta,
         scarpe: []
       }])
       .select();
 
     if (!error && data) {
-      setRaccolte([...raccolte, data[0]]);
+      setRaccolte(prev => [...prev, data[0]]);
       setNomeNuovaRaccolta('');
     } else {
       alert("Errore nella creazione della raccolta");
@@ -521,7 +622,7 @@ function MainApp() {
     const { error } = await supabase.from('raccolte_scarpe').delete().eq('id', idRaccolta);
 
     if (!error) {
-      setRaccolte(raccolte.filter(r => r.id !== idRaccolta));
+      setRaccolte(prev => prev.filter(r => r.id !== idRaccolta));
     } else {
       alert("Errore nell'eliminazione: " + error.message);
     }
@@ -797,11 +898,12 @@ function MainApp() {
       )}
 
       {/* VISTA CHAT SINGOLA */}
-      {vistaCorrente === 'chat_singola' && (
+      {(vistaCorrente === 'chat' || vistaCorrente === 'chat_singola') && (
         <ChatSingola
           conversazione={chatAttiva}
           utente={utente}
           setVistaCorrente={cambiaSchermata}
+          apriProfiloUtente={apriProfiloUtente}
         />
       )}
 
@@ -906,6 +1008,7 @@ function MainApp() {
         vistaCorrente={vistaCorrente}
         setVistaCorrente={cambiaSchermata}
         setQueryRicerca={setQueryRicerca}
+        messaggiNonLetti={messaggiNonLetti}
       />
 
       <ModaleRelazioni

@@ -1,9 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabase';
 
-function ChatSingola({ conversazione, utente, setVistaCorrente }) {
+// 1. Abbiamo aggiunto 'apriProfiloUtente' tra le props ricevute
+function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtente }) {
   const [messaggi, setMessaggi] = useState([]);
   const [testoMessaggio, setTestoMessaggio] = useState('');
+  const [isHovered, setIsHovered] = useState(false); // Stato locale per l'effetto hover sul nome
+  const fineMessaggiRef = useRef(null);
+  const primoScrollRef = useRef(true);
 
   useEffect(() => {
     if (!conversazione?.id) {
@@ -36,12 +40,10 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
         },
         (payload) => {
           setMessaggi((prev) => {
-            // CONTROLLO DUPLICATI: Se il messaggio è già nello stato (es. l'abbiamo appena inviato), ignoralo
             const messaggioGiaPresente = prev.some(msg => msg.id === payload.new.id);
             if (messaggioGiaPresente) {
               return prev;
             }
-            // Altrimenti, aggiungilo (es. messaggio ricevuto dall'altro utente)
             return [...prev, payload.new];
           });
         }
@@ -57,11 +59,9 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
     e.preventDefault();
     if (!testoMessaggio.trim() || !conversazione?.id || !utente?.id) return;
 
-    // 1. Salviamo il testo in una variabile e svuotiamo subito l'input
     const testoDaInviare = testoMessaggio.trim();
     setTestoMessaggio('');
 
-    // 2. Inviamo a Supabase, chiamando .select() per ottenere indietro la riga appena creata
     const { data, error } = await supabase.from('messaggi').insert([
       {
         conversazione_id: conversazione.id,
@@ -72,15 +72,12 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
 
     if (error) {
       console.error("Errore nell'invio del messaggio:", error);
-      // Ripristiniamo l'input in caso di errore
       setTestoMessaggio(testoDaInviare);
       return;
     }
 
-    // 3. AGGIORNAMENTO IMMEDIATO: aggiungiamo subito il nuovo messaggio alla lista sullo schermo
     if (data && data.length > 0) {
       setMessaggi((prevMessaggi) => {
-        // Ulteriore controllo di sicurezza per evitare duplicati anche qui
         if (prevMessaggi.some(msg => msg.id === data[0].id)) {
            return prevMessaggi;
         }
@@ -90,9 +87,34 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
   };
 
   const otherUserName = conversazione?.targetUsername || 'Utente';
+  
+  // Recuperiamo l'ID dell'altro utente all'interno della conversazione
+  const targetUserId = conversazione?.user1_id === utente?.id ? conversazione?.user2_id : conversazione?.user1_id;
+  const targetEmail = conversazione?.targetEmail || '';
+
+  const gestisciClickNome = () => {
+    // Se la prop è stata passata correttamente e abbiamo l'ID dell'altro utente, reindirizziamo
+    if (apriProfiloUtente && targetUserId) {
+      apriProfiloUtente(targetUserId, otherUserName, targetEmail);
+    }
+  };
+
+  useEffect(() => {
+    if (!messaggi || messaggi.length === 0) return;
+    fineMessaggiRef.current?.scrollIntoView({ behavior: primoScrollRef.current ? 'auto' : 'smooth' });
+    if (primoScrollRef.current) primoScrollRef.current = false;
+  }, [messaggi]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   return (
-    <div style={{ maxWidth: '900px', width: '100%', margin: '0 auto 50px auto', padding: '20px', borderRadius: '12px', backgroundColor: '#ffffff', color: '#111111', boxShadow: '0 2px 15px rgba(0,0,0,0.08)', fontFamily: 'sans-serif' }}>
+    <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', maxWidth: '900px', width: '100%', margin: '0 auto', padding: '20px', borderRadius: '12px', backgroundColor: '#ffffff', color: '#111111', boxShadow: '0 2px 15px rgba(0,0,0,0.08)', fontFamily: 'sans-serif', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <button
           onClick={() => setVistaCorrente('attivita')}
@@ -108,14 +130,30 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
         >
           ← Indietro
         </button>
+        
+        {/* Intestazione centrale col nome utente cliccabile */}
         <div style={{ textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: '13px', color: '#777777' }}>Chat con</p>
-          <h2 style={{ margin: '5px 0 0 0', fontSize: '22px', color: '#111111' }}>@{otherUserName}</h2>
+          <h2 
+            onClick={gestisciClickNome}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            style={{ 
+              margin: '5px 0 0 0', 
+              fontSize: '22px', 
+              color: '#111111',
+              cursor: 'pointer', // Rende evidente che è un link
+              textDecoration: isHovered ? 'underline' : 'none', // Sottolinea al passaggio del mouse
+              transition: 'all 0.2s ease'
+            }}
+          >
+            @{otherUserName}
+          </h2>
         </div>
         <div style={{ width: '80px' }} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minHeight: '400px', maxHeight: '500px', padding: '20px', backgroundColor: '#f0f2f5', borderRadius: '18px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, padding: '20px', backgroundColor: '#f0f2f5', borderRadius: '18px', overflowY: 'auto' }}>
         {messaggi.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#999999', padding: '40px 20px' }}>
             <p style={{ margin: 0, fontSize: '16px' }}>Inizia la conversazione qui.</p>
@@ -142,9 +180,10 @@ function ChatSingola({ conversazione, utente, setVistaCorrente }) {
             );
           })
         )}
+        <div ref={fineMessaggiRef} />
       </div>
 
-      <form onSubmit={inviaMessaggio} style={{ display: 'flex', gap: '10px', marginTop: '20px', alignItems: 'center' }}>
+      <form onSubmit={inviaMessaggio} style={{ display: 'flex', gap: '10px', marginTop: '20px', alignItems: 'center', flexShrink: 0 }}>
         <input
           value={testoMessaggio}
           onChange={(e) => setTestoMessaggio(e.target.value)}

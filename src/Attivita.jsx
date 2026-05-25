@@ -38,16 +38,30 @@ function Attivita({ utente, avviaChat, containerStyle }) {
         return acc;
       }, {});
 
-      setConversazioniLista(conversazioni.map((conversazione) => {
-        const otherUserId = conversazione.user1_id === utente.id ? conversazione.user2_id : conversazione.user1_id;
+      const conversazioniArricchite = await Promise.all((conversazioni || []).map(async (conversazione) => {
+        const otherUserId = conversazione?.user1_id === utente?.id ? conversazione?.user2_id : conversazione?.user1_id;
         const otherUser = profiliMap[otherUserId] || { id: otherUserId, username: 'Utente', email: '' };
+
+        const { count: nonLetti, error: countError } = await supabase
+          .from('messaggi')
+          .select('id', { count: 'exact' })
+          .eq('conversazione_id', conversazione.id)
+          .neq('mittente_id', utente.id)
+          .eq('letto', false);
+
+        if (countError) {
+          console.error('Errore conteggio messaggi non letti per conversazione:', countError.message || countError);
+        }
 
         return {
           ...conversazione,
           otherUserId,
-          otherUser
+          otherUser,
+          nonLetti: nonLetti || 0
         };
       }));
+
+      setConversazioniLista(conversazioniArricchite);
     };
 
     caricaConversazioni();
@@ -109,31 +123,38 @@ function Attivita({ utente, avviaChat, containerStyle }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {conversazioniLista.map((conversazione) => (
-                  <button
-                    key={conversazione.id}
-                    onClick={() => avviaChat(conversazione.otherUserId, conversazione.otherUser.username, conversazione.otherUser.email)}
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '18px',
-                      borderRadius: '15px',
-                      border: '1px solid #e6e8eb',
-                      backgroundColor: '#ffffff',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-                      cursor: 'pointer',
-                      color: '#111111',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px'
-                    }}
-                  >
-                    <span style={{ fontSize: '16px', fontWeight: 'bold' }}>@{conversazione.otherUser.username || 'Utente'}</span>
-                    <span style={{ fontSize: '14px', color: '#555555' }}>
-                      {conversazione.last_message || 'Tocca per continuare la conversazione.'}
-                    </span>
-                  </button>
-                ))}
+                {conversazioniLista.map((conversazione) => {
+                  const haMessaggiNonLetti = conversazione.nonLetti > 0;
+
+                  return (
+                    <button
+                      key={conversazione.id}
+                      onClick={() => avviaChat(conversazione.otherUserId, conversazione.otherUser.username, conversazione.otherUser.email)}
+                      style={{
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '18px',
+                        borderRadius: '15px',
+                        border: '1px solid #e6e8eb',
+                        borderLeft: haMessaggiNonLetti ? '4px solid #007BFF' : '1px solid #e6e8eb',
+                        backgroundColor: '#ffffff',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+                        cursor: 'pointer',
+                        color: '#111111',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}
+                    >
+                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: haMessaggiNonLetti ? '#007BFF' : '#111111' }}>
+                        @{conversazione.otherUser.username || 'Utente'}
+                      </span>
+                      <span style={{ fontSize: '14px', color: haMessaggiNonLetti ? '#111111' : '#555555', fontWeight: haMessaggiNonLetti ? 'bold' : 'normal' }}>
+                        {conversazione.last_message || 'Tocca per continuare la conversazione.'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
