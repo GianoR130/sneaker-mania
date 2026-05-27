@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from './supabase';
 
 function CatalogoScarpe({
+  utente,
   isAdmin,
   datiScarpe,
   scarpeFiltrate,
@@ -59,6 +61,105 @@ function CatalogoScarpe({
   creaRaccolta,
   containerStyle
 }) {
+  const [conversazioniAttive, setConversazioniAttive] = useState([]);
+  const [shareMenuAperto, setShareMenuAperto] = useState(null);
+  const [feedbackInvio, setFeedbackInvio] = useState({});
+
+  useEffect(() => {
+    const caricaConversazioni = async () => {
+      if (!utente?.id) {
+        setConversazioniAttive([]);
+        return;
+      }
+
+      const { data: conversazioni, error } = await supabase
+        .from('conversazioni')
+        .select('*')
+        .or(`user1_id.eq.${utente.id},user2_id.eq.${utente.id}`)
+        .order('updated_at', { ascending: false });
+
+      if (error || !conversazioni) {
+        setConversazioniAttive([]);
+        return;
+      }
+
+      const otherIds = [...new Set(
+        conversazioni
+          .map((conversazione) => (conversazione.user1_id === utente.id ? conversazione.user2_id : conversazione.user1_id))
+          .filter(Boolean)
+      )];
+
+      const { data: profili } = otherIds.length
+        ? await supabase.from('profili').select('id, username').in('id', otherIds)
+        : { data: [] };
+
+      const profiliMap = (profili || []).reduce((acc, profilo) => {
+        acc[profilo.id] = profilo;
+        return acc;
+      }, {});
+
+      setConversazioniAttive(conversazioni.map((conversazione) => {
+        const otherUserId = conversazione.user1_id === utente.id ? conversazione.user2_id : conversazione.user1_id;
+        return {
+          ...conversazione,
+          otherUserId,
+          otherUsername: profiliMap[otherUserId]?.username || 'Utente'
+        };
+      }));
+    };
+
+    caricaConversazioni();
+  }, [utente?.id]);
+
+  useEffect(() => {
+    if (!scarpaSelezionata) return;
+
+    const handleScrollToScarpa = () => {
+      setTimeout(() => {
+        try {
+          const elemento = document.getElementById(`scarpa-card-${scarpaSelezionata}`);
+          if (elemento) {
+            elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        } catch (err) {
+          console.error('Errore scroll alla scarpa selezionata:', err);
+        }
+      }, 100);
+    };
+
+    handleScrollToScarpa();
+  }, [scarpaSelezionata]);
+
+  const condividiScarpaInChat = async (scarpa, conversazione) => {
+    if (!utente?.id || !conversazione?.id) return;
+
+    const { error } = await supabase.from('messaggi').insert([{
+      conversazione_id: conversazione.id,
+      mittente_id: utente.id,
+      testo: `[CONDIVIDI_SCARPA:${scarpa.id}]`,
+      letto: false
+    }]);
+
+    if (error) {
+      console.error('Errore invio messaggio di condivisione:', error);
+      return;
+    }
+
+    setFeedbackInvio((prev) => ({
+      ...prev,
+      [scarpa.id]: `Scarpa inviata a ${conversazione.otherUsername || 'chat'}`
+    }));
+    setShareMenuAperto(null);
+
+    window.setTimeout(() => {
+      setFeedbackInvio((prev) => {
+        const next = { ...prev };
+        delete next[scarpa.id];
+        return next;
+      });
+    }, 2500);
+  };
+
   return (
     <div style={{ ...containerStyle, boxSizing: 'border-box' }}>
 
@@ -191,7 +292,7 @@ function CatalogoScarpe({
           const isSalvataOvunque = raccolte.some(r => r.scarpe.some(s => s.id === scarpa.id));
 
           return (
-            <li key={scarpa.id} style={{ 
+            <li id={`scarpa-card-${scarpa.id}`} key={scarpa.id} style={{ 
               padding: '15px', 
               backgroundColor: '#f8f9fa', 
               borderRadius: '8px', 
@@ -306,24 +407,119 @@ function CatalogoScarpe({
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef',
+                  color: '#111111',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold'
+                }}
+              >
+                {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
+              </button>
+              <button
+                onClick={() => setShareMenuAperto(shareMenuAperto === scarpa.id ? null : scarpa.id)}
+                style={{
+                  flex: 1,
+                  padding: '8px',
+                  backgroundColor: '#e9ecef',
+                  color: '#111111',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <polyline points="9 21 3 21 3 15"></polyline>
+                  <line x1="21" y1="3" x2="14" y2="10"></line>
+                  <line x1="3" y1="21" x2="10" y2="14"></line>
+                </svg>
+                Condividi
+              </button>
+            </div>
+
+            {shareMenuAperto === scarpa.id && (
+              <div style={{
+                position: 'relative',
+                width: '100%',
+                paddingTop: '10px'
+              }}>
+                <div style={{
+                  width: '100%',
+                  padding: '14px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #d8dce0',
+                  borderRadius: '12px',
+                  boxShadow: '0 12px 24px rgba(0,0,0,0.08)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '14px', color: '#111111' }}>Condividi in chat</strong>
+                    <button
+                      onClick={() => setShareMenuAperto(null)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#6c757d',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        padding: 0
+                      }}
+                    >
+                      Chiudi
+                    </button>
+                  </div>
+
+                  {conversazioniAttive.length === 0 ? (
+                    <p style={{ margin: 0, color: '#6c757d', fontSize: '14px' }}>Nessuna chat attiva disponibile.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                      {conversazioniAttive.map((conversazione) => (
                         <button
-                          onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
+                          key={conversazione.id}
+                          onClick={() => condividiScarpaInChat(scarpa, conversazione)}
                           style={{
-                            padding: '8px',
-                            backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef',
-                            color: '#111111',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            borderRadius: '10px',
+                            border: '1px solid #e6e8eb',
+                            backgroundColor: '#f8f9fa',
                             cursor: 'pointer',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            width: '100%'
+                            color: '#111111',
+                            fontSize: '14px'
                           }}
                         >
-                          {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
+                          @{conversazione.otherUsername}
                         </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
-                        {isAdmin && (
+            {feedbackInvio[scarpa.id] && (
+              <div style={{ marginTop: '8px', fontSize: '13px', color: '#28A745' }}>{feedbackInvio[scarpa.id]}</div>
+            )}
+
+            {isAdmin && (
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
                             <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>

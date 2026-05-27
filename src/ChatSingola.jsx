@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabase';
 
 // 1. Abbiamo aggiunto 'apriProfiloUtente' tra le props ricevute
-function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtente }) {
+function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtente, listaScarpe, setScarpaSelezionata }) {
   const [messaggi, setMessaggi] = useState([]);
   const [testoMessaggio, setTestoMessaggio] = useState('');
   const [isHovered, setIsHovered] = useState(false); // Stato locale per l'effetto hover sul nome
@@ -161,6 +161,57 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
         ) : (
           messaggi.map((msg) => {
             const isMine = msg.mittente_id === utente?.id;
+            const isShare = msg.testo?.startsWith('[CONDIVIDI_SCARPA:');
+            const scarpaIdMatch = isShare ? msg.testo.match(/\[CONDIVIDI_SCARPA:(\d+)\]/) : null;
+            const scarpaId = scarpaIdMatch ? Number(scarpaIdMatch[1]) : null;
+            const scarpaCondivisa = scarpaId != null
+              ? listaScarpe?.find((scarpa) => Number(scarpa.id) === scarpaId || scarpa.id === scarpaId)
+              : null;
+
+            if (isShare && scarpaCondivisa) {
+              return (
+                <button
+                  key={msg.id}
+                  onClick={() => {
+                    setVistaCorrente('catalogo');
+                    if (setScarpaSelezionata) setScarpaSelezionata(scarpaCondivisa.id);
+                  }}
+                  style={{
+                    alignSelf: isMine ? 'flex-end' : 'flex-start',
+                    width: '220px',
+                    textAlign: 'left',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  <div style={{
+                    borderRadius: '18px',
+                    overflow: 'hidden',
+                    backgroundColor: '#f8f9fa',
+                    boxShadow: '0 4px 18px rgba(0,0,0,0.08)',
+                    border: '1px solid #e6e8eb',
+                    color: '#111111',
+                    padding: '10px'
+                  }}>
+                    <div style={{ width: '100%', maxHeight: '140px', height: '140px', backgroundColor: '#e9ecef', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                      {scarpaCondivisa.immagine ? (
+                        <img src={scarpaCondivisa.immagine} alt={scarpaCondivisa.modello} style={{ width: '100%', height: '280px', objectFit: 'contain' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#6c757d', fontSize: '28px' }}>👟</div>
+                      )}
+                    </div>
+                    <div style={{ padding: '8px 0 0 0' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', margin: '6px 0 2px 0', color: '#111111' }}>{scarpaCondivisa.modello}</div>
+                      <div style={{ fontSize: '12px', color: '#555555', lineHeight: '1.3' }}>{scarpaCondivisa.brand} · {scarpaCondivisa.genere || 'Unisex'}</div>
+                      <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 'bold', color: '#007BFF' }}>€{scarpaCondivisa.prezzo || 'N/D'}</div>
+                    </div>
+                  </div>
+                </button>
+              );
+            }
+
             return (
               <div
                 key={msg.id}

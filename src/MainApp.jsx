@@ -51,7 +51,13 @@ function MainApp() {
   const [password, setPassword] = useState('');
   const [utente, setUtente] = useState(null);
 
-  const [vistaCorrente, setVistaCorrente] = useState('social');
+  const [vistaCorrente, setVistaCorrente] = useState(() => {
+    try {
+      return localStorage.getItem('vistaCorrente') || 'social';
+    } catch (err) {
+      return 'social';
+    }
+  });
 
   // --- STATI FUNZIONALITÀ RACCOLTE E SALVATAGGIO ---
   const [raccolte, setRaccolte] = useState([]);
@@ -148,6 +154,16 @@ function MainApp() {
   // --- SCROLL IN CIMA AUTOMATICO ---
   useEffect(() => {
     window.scrollTo(0, 0);
+  }, [vistaCorrente]);
+
+  // Persist vistaCorrente in localStorage so refresh keeps the same screen
+  useEffect(() => {
+    try {
+      if (vistaCorrente) localStorage.setItem('vistaCorrente', vistaCorrente);
+      else localStorage.removeItem('vistaCorrente');
+    } catch (err) {
+      console.error('Errore salvataggio vistaCorrente in localStorage:', err);
+    }
   }, [vistaCorrente]);
 
   useEffect(() => {
@@ -779,6 +795,11 @@ function MainApp() {
     setRaccolte([]);
     setMioProfilo(null);
     await supabase.auth.signOut();
+    try {
+      localStorage.removeItem('vistaCorrente');
+    } catch (err) {
+      console.error('Errore rimozione vistaCorrente da localStorage:', err);
+    }
     cambiaSchermata('social');
   };
 
@@ -904,12 +925,15 @@ function MainApp() {
           utente={utente}
           setVistaCorrente={cambiaSchermata}
           apriProfiloUtente={apriProfiloUtente}
+          listaScarpe={datiScarpe}
+          setScarpaSelezionata={setScarpaSelezionata}
         />
       )}
 
       {/* CATALOGO SCARPE */}
       {vistaCorrente === 'catalogo' && (
         <CatalogoScarpe
+          utente={utente}
           isAdmin={isAdmin}
           datiScarpe={datiScarpe}
           scarpeFiltrate={scarpeFiltrate}
