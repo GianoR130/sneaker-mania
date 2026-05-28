@@ -51,6 +51,7 @@ function MainApp() {
   const [password, setPassword] = useState('');
   const [utente, setUtente] = useState(null);
 
+  // PERSISTENZA DELLA NAVIGAZIONE (Anti-schermo bianco)
   const [vistaCorrente, setVistaCorrente] = useState(() => {
     try {
       return localStorage.getItem('vistaCorrente') || 'social';
@@ -73,8 +74,16 @@ function MainApp() {
   const [conversazioni, setConversazioni] = useState([]);
   const [messaggiNonLetti, setMessaggiNonLetti] = useState(0);
 
-  // --- STATI PER I PROFILI E FOLLOWER ---
-  const [profiloSelezionato, setProfiloSelezionato] = useState({ id: null, username: '' });
+  // --- STATI PER I PROFILI E FOLLOWER (Con lettura iniziale da localStorage) ---
+  const [profiloSelezionato, setProfiloSelezionato] = useState(() => {
+    try {
+      const salvato = localStorage.getItem('profiloSelezionato');
+      return salvato ? JSON.parse(salvato) : { id: null, username: '' };
+    } catch (err) {
+      return { id: null, username: '' };
+    }
+  });
+
   const [seguitiInfo, setSeguitiInfo] = useState({ followers: 0, following: 0, isFollowing: false, isFriend: false });
   const [mieRelazioni, setMieRelazioni] = useState({ followers: 0, following: 0 });
   const [mioProfilo, setMioProfilo] = useState(null);
@@ -86,6 +95,26 @@ function MainApp() {
 
   const [genereNuovo, setGenereNuovo] = useState('Unisex');
   const [genereModificato, setGenereModificato] = useState('Unisex');
+
+  // --- SINCRONIZZAZIONE LOCALSTORAGE PER AGGIORNAMENTI PAGINA ---
+  useEffect(() => {
+    try {
+      localStorage.setItem('vistaCorrente', vistaCorrente);
+
+      if (profiloSelezionato && profiloSelezionato.id) {
+        localStorage.setItem('profiloSelezionato', JSON.stringify(profiloSelezionato));
+      } else {
+        localStorage.removeItem('profiloSelezionato');
+      }
+
+      // Se ricarichi la pagina sulla vista profilo altrui ma lo stato si è svuotato, torna al feed in sicurezza
+      if (vistaCorrente === 'profilo_altro_utente' && (!profiloSelezionato || !profiloSelezionato.id)) {
+        setVistaCorrente('social');
+      }
+    } catch (err) {
+      console.error("Errore nel salvataggio dello stato di navigazione:", err);
+    }
+  }, [vistaCorrente, profiloSelezionato]);
 
   const isAdmin = utente?.email === EMAIL_ADMIN;
 
@@ -136,7 +165,7 @@ function MainApp() {
     }
     viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0';
 
-    return () => {};
+    return () => { };
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -844,15 +873,22 @@ function MainApp() {
       margin: '0 auto'
     }}>
 
-      {/* BARRA DI NAVIGAZIONE SUPERIORE */}
+      {/* 🛠️ FIX DEFINITIVO ANTI-SPOSTAMENTO COPERTO DA SCROLLBAR */}
+      <style>{`
+        html {
+          scrollbar-gutter: stable;
+        }
+      `}</style>
+
+      {/* BARRA DI NAVIGAZIONE SUPERIORE (STILIZZATA DNA VISIVO) */}
       <div style={{
         maxWidth: '900px',
-        margin: '0 auto 20px auto',
+        margin: '0 auto 25px auto',
         backgroundColor: '#ffffff',
         color: '#111111',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+        padding: '14px 20px',
+        borderRadius: '15px',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -860,12 +896,42 @@ function MainApp() {
         flexWrap: 'wrap'
       }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, color: '#111111', fontSize: '18px', whiteSpace: 'nowrap' }}>Sneaker Mania</h2>
+          <h2 style={{ margin: 0, color: '#111111', fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
+            Sneaker Mania
+          </h2>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
-          {isAdmin && <span style={{ backgroundColor: '#ffc107', color: '#111111', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>ADMIN</span>}
-          <button onClick={logout} style={{ padding: '8px 16px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
+          {isAdmin && (
+            <span style={{
+              backgroundColor: '#ffc107',
+              color: '#111111',
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              letterSpacing: '0.5px'
+            }}>
+              ADMIN
+            </span>
+          )}
+          <button
+            onClick={logout}
+            style={{
+              padding: '8px 20px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '25px', // Pill style coerente con il DNA
+              cursor: 'pointer',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              transition: 'all 0.2s ease',
+              boxShadow: '0 2px 8px rgba(220, 53, 69, 0.2)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
             Esci
           </button>
         </div>
@@ -1015,7 +1081,7 @@ function MainApp() {
         />
       )}
       {/* PROFILO ALTRO UTENTE */}
-      {vistaCorrente === 'profilo_altro_utente' && profiloSelezionato.id && (
+      {vistaCorrente === 'profilo_altro_utente' && profiloSelezionato?.id && (
         <ProfiloAltroUtente
           profiloSelezionato={profiloSelezionato}
           seguitiInfo={seguitiInfo}
