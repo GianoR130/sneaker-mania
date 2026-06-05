@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from './supabase';
 
-// 1. Abbiamo aggiunto 'apriProfiloUtente' tra le props ricevute
 function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtente, listaScarpe, setScarpaSelezionata }) {
   const [messaggi, setMessaggi] = useState([]);
   const [testoMessaggio, setTestoMessaggio] = useState('');
-  const [isHovered, setIsHovered] = useState(false); // Stato locale per l'effetto hover sul nome
+  const [isHovered, setIsHovered] = useState(false); // Stato per hover sul nome utente
+  const [isBackHovered, setIsBackHovered] = useState(false); // Stato per hover sul tasto indietro
+  const [isSendHovered, setIsSendHovered] = useState(false); // Stato per hover sul tasto invia
   const fineMessaggiRef = useRef(null);
   const primoScrollRef = useRef(true);
 
@@ -87,13 +88,10 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
   };
 
   const otherUserName = conversazione?.targetUsername || 'Utente';
-  
-  // Recuperiamo l'ID dell'altro utente all'interno della conversazione
   const targetUserId = conversazione?.user1_id === utente?.id ? conversazione?.user2_id : conversazione?.user1_id;
   const targetEmail = conversazione?.targetEmail || '';
 
   const gestisciClickNome = () => {
-    // Se la prop è stata passata correttamente e abbiamo l'ID dell'altro utente, reindirizziamo
     if (apriProfiloUtente && targetUserId) {
       apriProfiloUtente(targetUserId, otherUserName, targetEmail);
     }
@@ -114,24 +112,42 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
   }, []);
 
   return (
-    <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', maxWidth: '900px', width: '100%', margin: '0 auto', padding: '20px', borderRadius: '12px', backgroundColor: '#ffffff', color: '#111111', boxShadow: '0 2px 15px rgba(0,0,0,0.08)', fontFamily: 'sans-serif', overflow: 'hidden' }}>
+    <div style={{ 
+      height: 'calc(100vh - 80px)', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      maxWidth: '900px', 
+      width: '100%', 
+      margin: '0 auto', 
+      padding: '20px', 
+      borderRadius: '15px', 
+      backgroundColor: '#ffffff', 
+      color: '#111111', 
+      boxShadow: '0 4px 15px rgba(0,0,0,0.1)', 
+      fontFamily: 'sans-serif', 
+      overflow: 'hidden' 
+    }}>
+      
+      {/* HEADER DELLA CHAT */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <button
           onClick={() => setVistaCorrente('attivita')}
+          onMouseEnter={() => setIsBackHovered(true)}
+          onMouseLeave={() => setIsBackHovered(false)}
           style={{
-            padding: '8px 14px',
-            borderRadius: '10px',
+            padding: '8px 16px',
+            borderRadius: '25px',
             border: 'none',
-            backgroundColor: '#f0f2f5',
+            backgroundColor: isBackHovered ? '#e4e6eb' : '#f0f2f5',
             color: '#111111',
             cursor: 'pointer',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            transition: 'all 0.2s ease'
           }}
         >
           ← Indietro
         </button>
         
-        {/* Intestazione centrale col nome utente cliccabile */}
         <div style={{ textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: '13px', color: '#777777' }}>Chat con</p>
           <h2 
@@ -142,8 +158,8 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
               margin: '5px 0 0 0', 
               fontSize: '22px', 
               color: '#111111',
-              cursor: 'pointer', // Rende evidente che è un link
-              textDecoration: isHovered ? 'underline' : 'none', // Sottolinea al passaggio del mouse
+              cursor: 'pointer',
+              textDecoration: isHovered ? 'underline' : 'none',
               transition: 'all 0.2s ease'
             }}
           >
@@ -153,9 +169,19 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
         <div style={{ width: '80px' }} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, padding: '20px', backgroundColor: '#f0f2f5', borderRadius: '18px', overflowY: 'auto' }}>
+      {/* AREA MESSAGGI */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '12px', 
+        flex: 1, 
+        padding: '20px', 
+        backgroundColor: '#f0f2f5', 
+        borderRadius: '15px', 
+        overflowY: 'auto' 
+      }}>
         {messaggi.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#999999', padding: '40px 20px' }}>
+          <div style={{ textAlign: 'center', color: '#777777', padding: '40px 20px' }}>
             <p style={{ margin: 0, fontSize: '16px' }}>Inizia la conversazione qui.</p>
           </div>
         ) : (
@@ -168,6 +194,7 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
               ? listaScarpe?.find((scarpa) => Number(scarpa.id) === scarpaId || scarpa.id === scarpaId)
               : null;
 
+            // Renderizzazione Card Scarpa Condivisa
             if (isShare && scarpaCondivisa) {
               return (
                 <button
@@ -178,50 +205,64 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
                   }}
                   style={{
                     alignSelf: isMine ? 'flex-end' : 'flex-start',
-                    width: '220px',
+                    width: '240px',
                     textAlign: 'left',
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer',
-                    padding: 0
+                    padding: 0,
+                    transition: 'transform 0.2s ease',
                   }}
+                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                 >
                   <div style={{
-                    borderRadius: '18px',
+                    borderRadius: '15px',
                     overflow: 'hidden',
-                    backgroundColor: '#f8f9fa',
-                    boxShadow: '0 4px 18px rgba(0,0,0,0.08)',
+                    backgroundColor: '#ffffff',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
                     border: '1px solid #e6e8eb',
                     color: '#111111',
-                    padding: '10px'
+                    padding: '12px'
                   }}>
-                    <div style={{ width: '100%', maxHeight: '140px', height: '140px', backgroundColor: '#e9ecef', display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                    <div style={{ 
+                      width: '100%', 
+                      maxHeight: '140px', 
+                      height: '140px', 
+                      backgroundColor: '#f0f2f5', 
+                      borderRadius: '10px',
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center', 
+                      overflow: 'hidden' 
+                    }}>
                       {scarpaCondivisa.immagine ? (
-                        <img src={scarpaCondivisa.immagine} alt={scarpaCondivisa.modello} style={{ width: '100%', height: '280px', objectFit: 'contain' }} />
+                        <img src={scarpaCondivisa.immagine} alt={scarpaCondivisa.modello} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                       ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#6c757d', fontSize: '28px' }}>👟</div>
+                        <div style={{ color: '#6c757d', fontSize: '32px' }}>👟</div>
                       )}
                     </div>
                     <div style={{ padding: '8px 0 0 0' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', margin: '6px 0 2px 0', color: '#111111' }}>{scarpaCondivisa.modello}</div>
-                      <div style={{ fontSize: '12px', color: '#555555', lineHeight: '1.3' }}>{scarpaCondivisa.brand} · {scarpaCondivisa.genere || 'Unisex'}</div>
-                      <div style={{ marginTop: '8px', fontSize: '12px', fontWeight: 'bold', color: '#007BFF' }}>€{scarpaCondivisa.prezzo || 'N/D'}</div>
+                      <div style={{ fontSize: '14px', fontWeight: 'bold', margin: '4px 0 2px 0', color: '#111111' }}>{scarpaCondivisa.modello}</div>
+                      <div style={{ fontSize: '12px', color: '#666666', lineHeight: '1.3' }}>{scarpaCondivisa.brand} · {scarpaCondivisa.genere || 'Unisex'}</div>
+                      <div style={{ marginTop: '8px', fontSize: '13px', fontWeight: 'bold', color: '#007BFF' }}>€{scarpaCondivisa.prezzo || 'N/D'}</div>
                     </div>
                   </div>
                 </button>
               );
             }
 
+            // Renderizzazione Messaggio di Testo Standard
             return (
               <div
                 key={msg.id}
                 style={{
                   alignSelf: isMine ? 'flex-end' : 'flex-start',
-                  maxWidth: '85%',
+                  maxWidth: '75%',
                   backgroundColor: isMine ? '#007BFF' : '#ffffff',
                   color: isMine ? '#ffffff' : '#111111',
                   borderRadius: '18px',
-                  padding: '14px 16px',
+                  padding: '12px 16px',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
                   border: isMine ? 'none' : '1px solid #e6e8eb'
                 }}
@@ -234,6 +275,7 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
         <div ref={fineMessaggiRef} />
       </div>
 
+      {/* FORM DI INVIO MESSAGGIO */}
       <form onSubmit={inviaMessaggio} style={{ display: 'flex', gap: '10px', marginTop: '20px', alignItems: 'center', flexShrink: 0 }}>
         <input
           value={testoMessaggio}
@@ -241,25 +283,30 @@ function ChatSingola({ conversazione, utente, setVistaCorrente, apriProfiloUtent
           placeholder="Scrivi un messaggio..."
           style={{
             flex: 1,
-            padding: '14px 16px',
-            borderRadius: '18px',
+            padding: '14px 20px',
+            borderRadius: '25px',
             border: '1px solid #e6e8eb',
             outline: 'none',
             fontSize: '15px',
             color: '#111111',
-            backgroundColor: '#ffffff'
+            backgroundColor: '#ffffff',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)'
           }}
         />
         <button
           type="submit"
+          onMouseEnter={() => setIsSendHovered(true)}
+          onMouseLeave={() => setIsSendHovered(false)}
           style={{
-            padding: '14px 20px',
-            borderRadius: '18px',
+            padding: '14px 24px',
+            borderRadius: '25px',
             border: 'none',
-            backgroundColor: '#007BFF',
+            backgroundColor: isSendHovered ? '#0056b3' : '#007BFF',
             color: '#ffffff',
             fontWeight: 'bold',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 6px rgba(0,123,255,0.2)'
           }}
         >
           Invia

@@ -22,7 +22,6 @@ function CatalogoScarpe({
   setPrezzoModificato,
   coloreModificato,
   setColoreModificato,
-  // NUOVI STATI PER IL GENERE PASSATI DAL PADRE
   genereNuovo = 'Unisex',
   setGenereNuovo,
   genereModificato,
@@ -147,7 +146,7 @@ function CatalogoScarpe({
 
     setFeedbackInvio((prev) => ({
       ...prev,
-      [scarpa.id]: `Scarpa inviata a ${conversazione.otherUsername || 'chat'}`
+      [scarpa.id]: `Scarpa inviata a @${conversazione.otherUsername || 'chat'}`
     }));
     setShareMenuAperto(null);
 
@@ -177,50 +176,93 @@ function CatalogoScarpe({
         <option value="Multicolore" />
       </datalist>
 
-      <div style={{ borderBottom: '1px solid #eee', paddingBottom: '15px', textAlign: 'left' }}>
-        <h1 style={{ margin: 0, fontSize: '28px', color: '#111111' }}>Catalogo Scarpe</h1>
+      {/* Intestazione Catalogo */}
+      <div style={{ borderBottom: '1px solid #eaeaea', paddingBottom: '15px', textAlign: 'left', marginBottom: '20px' }}>
+        <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 'bold', color: '#111111', letterSpacing: '-0.5px' }}>
+          Catalogo Scarpe
+        </h1>
       </div>
 
-      <div style={{ marginTop: '20px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      {/* Barra di Ricerca e Bottone Filtri */}
+      <div style={{ marginBottom: '25px' }}>
+        <div style={{ display: 'flex', gap: '12px' }}>
           <input
             type="text"
             placeholder="Cerca per brand o modello..."
             value={ricercaTesto}
             onChange={(e) => setRicercaTesto(e.target.value)}
-            style={{ flex: 1, padding: '12px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '16px', minWidth: 0, color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box' }}
+            style={{ 
+              flex: 1, 
+              padding: '14px 18px', 
+              borderRadius: '25px', 
+              border: '1px solid #e6e8eb', 
+              fontSize: '15px', 
+              color: '#111111', 
+              backgroundColor: '#ffffff', 
+              boxSizing: 'border-box',
+              outline: 'none',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+            }}
           />
           <button
             onClick={() => setMostraFiltri(!mostraFiltri)}
-            style={{ padding: '12px 20px', backgroundColor: '#e9ecef', color: '#111111', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', flexShrink: 0 }}
+            style={{ 
+              padding: '12px 24px', 
+              backgroundColor: '#111111', 
+              color: '#ffffff', 
+              border: 'none', 
+              borderRadius: '25px', 
+              cursor: 'pointer', 
+              fontWeight: 'bold',
+              fontSize: '14px',
+              flexShrink: 0,
+              transition: 'all 0.2s ease',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+            }}
           >
-            Filtri {mostraFiltri ? 'Su' : 'Giu'}
+            Filtri {mostraFiltri ? '▲' : '▼'}
           </button>
         </div>
 
+        {/* Pannello dei Filtri Dropdown */}
         {mostraFiltri && (
-          <div style={{ marginTop: '10px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #ddd', display: 'flex', gap: '15px', flexWrap: 'wrap', boxSizing: 'border-box', textAlign: 'left' }}>
+          <div style={{ 
+            marginTop: '15px', 
+            padding: '20px', 
+            backgroundColor: '#ffffff', 
+            borderRadius: '16px', 
+            border: '1px solid #e6e8eb', 
+            display: 'flex', 
+            gap: '15px', 
+            flexWrap: 'wrap', 
+            boxSizing: 'border-box', 
+            textAlign: 'left',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.05)'
+          }}>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '120px' }}>
-              <label style={{ fontSize: '12px', marginBottom: '4px', fontWeight: 'bold', color: '#111111' }}>Prezzo Min</label>
-              <input type="number" value={filtroPrezzoMin} onChange={(e) => setFiltroPrezzoMin(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', color: '#111111', backgroundColor: '#ffffff' }} />
+              <label style={{ fontSize: '12px', marginBottom: '6px', fontWeight: 'bold', color: '#111111' }}>Prezzo Min (€)</label>
+              <input type="number" value={filtroPrezzoMin} onChange={(e) => setFiltroPrezzoMin(e.target.value)} style={{ padding: '10px', border: '1px solid #e6e8eb', borderRadius: '8px', color: '#111111', backgroundColor: '#f0f2f5', outline: 'none' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '120px' }}>
-              <label style={{ fontSize: '12px', marginBottom: '4px', fontWeight: 'bold', color: '#111111' }}>Prezzo Max</label>
-              <input type="number" value={filtroPrezzoMax} onChange={(e) => setFiltroPrezzoMax(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', color: '#111111', backgroundColor: '#ffffff' }} />
+              <label style={{ fontSize: '12px', marginBottom: '6px', fontWeight: 'bold', color: '#111111' }}>Prezzo Max (€)</label>
+              <input type="number" value={filtroPrezzoMax} onChange={(e) => setFiltroPrezzoMax(e.target.value)} style={{ padding: '10px', border: '1px solid #e6e8eb', borderRadius: '8px', color: '#111111', backgroundColor: '#f0f2f5', outline: 'none' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '120px' }}>
-              <label style={{ fontSize: '12px', marginBottom: '4px', fontWeight: 'bold', color: '#111111' }}>Brand</label>
-              <select value={filtroBrand} onChange={(e) => setFiltroBrand(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', color: '#111111', backgroundColor: '#ffffff' }}>
+              <label style={{ fontSize: '12px', marginBottom: '6px', fontWeight: 'bold', color: '#111111' }}>Brand</label>
+              <select value={filtroBrand} onChange={(e) => setFiltroBrand(e.target.value)} style={{ padding: '10px', border: '1px solid #e6e8eb', borderRadius: '8px', color: '#111111', backgroundColor: '#f0f2f5', cursor: 'pointer', outline: 'none' }}>
                 <option value="">Tutti</option>
                 {brandUnici.map(brand => <option key={brand} value={brand}>{brand}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: '120px' }}>
-              <label style={{ fontSize: '12px', marginBottom: '4px', fontWeight: 'bold', color: '#111111' }}>Colore</label>
-              <input list="lista-colori" placeholder="Scegli..." value={filtroColore} onChange={(e) => setFiltroColore(e.target.value)} style={{ padding: '8px', border: '1px solid #ccc', borderRadius: '4px', color: '#111111', backgroundColor: '#ffffff' }} />
+              <label style={{ fontSize: '12px', marginBottom: '6px', fontWeight: 'bold', color: '#111111' }}>Colore</label>
+              <input list="lista-colori" placeholder="Scegli..." value={filtroColore} onChange={(e) => setFiltroColore(e.target.value)} style={{ padding: '10px', border: '1px solid #e6e8eb', borderRadius: '8px', color: '#111111', backgroundColor: '#f0f2f5', outline: 'none' }} />
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <button onClick={() => { setFiltroPrezzoMin(''); setFiltroPrezzoMax(''); setFiltroBrand(''); setFiltroColore(''); }} style={{ padding: '8px 12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', height: '35px' }}>
+              <button 
+                onClick={() => { setFiltroPrezzoMin(''); setFiltroPrezzoMax(''); setFiltroBrand(''); setFiltroColore(''); }} 
+                style={{ padding: '10px 18px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s ease' }}
+              >
                 Resetta
               </button>
             </div>
@@ -228,62 +270,65 @@ function CatalogoScarpe({
         )}
       </div>
 
+      {/* Area Admin: Gestione Catalogo */}
       {isAdmin && (
-        <div style={{ padding: '15px', backgroundColor: '#f1f3f5', borderRadius: '8px', color: '#111111', textAlign: 'left', boxSizing: 'border-box' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#111111' }}>Area Admin: Gestione Catalogo</h3>
-          <form onSubmit={aggiungiScarpa} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ padding: '20px', backgroundColor: '#ffffff', borderRadius: '16px', color: '#111111', textAlign: 'left', boxSizing: 'border-box', border: '1px solid #ffc107', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', marginBottom: '25px' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#111111', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: '#ffc107' }}>⚡</span> Area Admin: Gestione Catalogo
+          </h3>
+          <form onSubmit={aggiungiScarpa} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <input type="text" placeholder="Brand (Es. Nike)" value={nuovoBrand} onChange={(e) => setNuovoBrand(e.target.value)} style={{ flex: 2, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '120px', color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
+              <input type="text" placeholder="Brand (Es. Nike)" value={nuovoBrand} onChange={(e) => setNuovoBrand(e.target.value)} style={{ flex: 2, padding: '11px', borderRadius: '8px', border: '1px solid #e6e8eb', minWidth: '120px', color: '#111111', backgroundColor: '#f0f2f5', boxSizing: 'border-box', outline: 'none' }} />
               
-              {/* DROPDOWN GENERE AGGIUNTA A FIANCO AL BRAND */}
               <select 
                 value={genereNuovo} 
                 onChange={(e) => setGenereNuovo(e.target.value)} 
-                style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '11px', borderRadius: '8px', border: '1px solid #e6e8eb', minWidth: '100px', color: '#111111', backgroundColor: '#f0f2f5', boxSizing: 'border-box', cursor: 'pointer', outline: 'none' }}
               >
                 <option value="Unisex">Unisex</option>
                 <option value="Uomo">Uomo</option>
                 <option value="Donna">Donna</option>
               </select>
 
-              <input type="text" placeholder="Modello (Es. Air Force 1)" value={nuovoModello} onChange={(e) => setNuovoModello(e.target.value)} style={{ flex: 2, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '120px', color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
+              <input type="text" placeholder="Modello (Es. Air Force 1)" value={nuovoModello} onChange={(e) => setNuovoModello(e.target.value)} style={{ flex: 2, padding: '11px', borderRadius: '8px', border: '1px solid #e6e8eb', minWidth: '120px', color: '#111111', backgroundColor: '#f0f2f5', boxSizing: 'border-box', outline: 'none' }} />
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <input type="number" placeholder="Prezzo" value={nuovoPrezzo} onChange={(e) => setNuovoPrezzo(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
-              <input list="lista-colori" placeholder="Colore (scegli o scrivi)" value={nuovoColore} onChange={(e) => setNuovoColore(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #ccc', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', boxSizing: 'border-box' }} />
-              <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0 }}>Aggiungi</button>
+              <input type="number" placeholder="Prezzo (€)" value={nuovoPrezzo} onChange={(e) => setNuovoPrezzo(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '8px', border: '1px solid #e6e8eb', minWidth: '100px', color: '#111111', backgroundColor: '#f0f2f5', boxSizing: 'border-box', outline: 'none' }} />
+              <input list="lista-colori" placeholder="Colore (scegli o scrivi)" value={nuovoColore} onChange={(e) => setNuovoColore(e.target.value)} style={{ flex: 1, padding: '11px', borderRadius: '8px', border: '1px solid #e6e8eb', minWidth: '100px', color: '#111111', backgroundColor: '#f0f2f5', boxSizing: 'border-box', outline: 'none' }} />
+              <button type="submit" style={{ padding: '11px 24px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontWeight: 'bold', flexShrink: 0, transition: 'all 0.2s ease', boxShadow: '0 4px 12px rgba(40,167,69,0.2)' }}>Aggiungi</button>
             </div>
             <div>
-              <label style={{ fontSize: '13px', color: '#555555', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <input type="checkbox" checked={mantieniDati} onChange={(e) => setMantieniDati(e.target.checked)} />
+              <label style={{ fontSize: '13px', color: '#666666', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <input type="checkbox" checked={mantieniDati} onChange={(e) => setMantieniDati(e.target.checked)} style={{ cursor: 'pointer', width: '16px', height: '16px' }} />
                 Mantieni i dati inseriti dopo il salvataggio
               </label>
             </div>
           </form>
 
-          <hr style={{ borderTop: '1px solid #ddd', margin: '20px 0' }} />
+          <hr style={{ border: 'none', borderTop: '1px solid #eaeaea', margin: '20px 0' }} />
 
           <div>
-            <h4 style={{ margin: '0 0 10px 0', color: '#111111' }}>Importazione Massiva</h4>
-            <div style={{ padding: '10px', border: '1px dashed #aaa', borderRadius: '4px', backgroundColor: '#fff', display: 'flex', flexDirection: 'column', gap: '5px', boxSizing: 'border-box' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <label style={{ fontWeight: 'bold', color: '#111111' }}>Carica File CSV:</label>
-                <input type="file" accept=".csv" onChange={gestisciImportazioneCSV} style={{ color: '#111111' }} />
+            <h4 style={{ margin: '0 0 10px 0', color: '#111111', fontSize: '14px', fontWeight: 'bold' }}>Importazione Massiva</h4>
+            <div style={{ padding: '15px', border: '1px dashed #cccccc', borderRadius: '12px', backgroundColor: '#f0f2f5', display: 'flex', flexDirection: 'column', gap: '6px', boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <label style={{ fontWeight: 'bold', color: '#111111', fontSize: '13px' }}>Carica File CSV:</label>
+                <input type="file" accept=".csv" onChange={gestisciImportazioneCSV} style={{ color: '#111111', fontSize: '13px' }} />
               </div>
-              <p style={{ margin: 0, fontSize: '12px', color: '#555555' }}>
-                Intestazione richiesta: <strong>brand, modello, prezzo, colore, genere</strong>.
+              <p style={{ margin: 0, fontSize: '12px', color: '#666666' }}>
+                L'intestazione del file deve contenere esattamente: <strong>brand, modello, prezzo, colore, genere</strong>.
               </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Grid Cards dei Prodotti Catalogo */}
       <ul style={{
         listStyleType: 'none',
         padding: 0,
         marginTop: '25px',
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
         gap: '20px',
         width: '100%',
         boxSizing: 'border-box'
@@ -292,69 +337,73 @@ function CatalogoScarpe({
           const isSalvataOvunque = raccolte.some(r => r.scarpe.some(s => s.id === scarpa.id));
 
           return (
-            <li id={`scarpa-card-${scarpa.id}`} key={scarpa.id} style={{ 
-              padding: '15px', 
-              backgroundColor: '#f8f9fa', 
-              borderRadius: '8px', 
-              borderLeft: isAdmin ? '5px solid #ffc107' : '5px solid #17A2B8', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: '10px', 
-              color: '#111111',
-              textAlign: 'left',
-              boxSizing: 'border-box',
-              maxWidth: '100%',
-              overflow: 'hidden'
-            }}>
-
+            <li 
+              id={`scarpa-card-${scarpa.id}`} 
+              key={scarpa.id} 
+              style={{ 
+                padding: '18px', 
+                backgroundColor: '#ffffff', 
+                borderRadius: '16px', 
+                borderLeft: isAdmin ? '5px solid #ffc107' : '5px solid #007BFF', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                gap: '12px', 
+                color: '#111111',
+                textAlign: 'left',
+                boxSizing: 'border-box',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.05)'
+              }}
+            >
+              {/* Stato di Modifica Amministrativa */}
               {idInModifica === scarpa.id ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input type="text" value={brandModificato} onChange={(e) => setBrandModificato(e.target.value)} style={{ flex: 2, padding: '8px', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '4px' }} placeholder="Brand" />
+                    <input type="text" value={brandModificato} onChange={(e) => setBrandModificato(e.target.value)} style={{ flex: 2, padding: '10px', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '6px', outline: 'none' }} placeholder="Brand" />
                     
-                    {/* DROPDOWN DI MODIFICA DEL GENERE */}
                     <select 
                       value={genereModificato || 'Unisex'} 
                       onChange={(e) => setGenereModificato(e.target.value)}
-                      style={{ flex: 1, padding: '8px', minWidth: '90px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '4px' }}
+                      style={{ flex: 1, padding: '10px', minWidth: '90px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', outline: 'none' }}
                     >
                       <option value="Unisex">Unisex</option>
                       <option value="Uomo">Uomo</option>
                       <option value="Donna">Donna</option>
                     </select>
 
-                    <input type="text" value={modelloModificato} onChange={(e) => setModelloModificato(e.target.value)} style={{ flex: 2, padding: '8px', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '4px' }} placeholder="Modello" />
+                    <input type="text" value={modelloModificato} onChange={(e) => setModelloModificato(e.target.value)} style={{ flex: 2, padding: '10px', minWidth: '100px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '6px', outline: 'none' }} placeholder="Modello" />
                   </div>
                   <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                    <input type="number" value={prezzoModificato} onChange={(e) => setPrezzoModificato(e.target.value)} style={{ flex: 1, padding: '8px', minWidth: '80px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '4px' }} placeholder="Prezzo" />
-                    <input list="lista-colori" value={coloreModificato} onChange={(e) => setColoreModificato(e.target.value)} style={{ flex: 1, padding: '8px', minWidth: '80px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '4px' }} placeholder="Colore" />
+                    <input type="number" value={prezzoModificato} onChange={(e) => setPrezzoModificato(e.target.value)} style={{ flex: 1, padding: '10px', minWidth: '80px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '6px', outline: 'none' }} placeholder="Prezzo" />
+                    <input list="lista-colori" value={coloreModificato} onChange={(e) => setColoreModificato(e.target.value)} style={{ flex: 1, padding: '10px', minWidth: '80px', color: '#111111', backgroundColor: '#ffffff', border: '1px solid #ccc', borderRadius: '6px', outline: 'none' }} placeholder="Colore" />
                   </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => salvaModifica(scarpa.id)} style={{ flex: 1, padding: '8px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Salva</button>
-                    <button onClick={() => setIdInModifica(null)} style={{ flex: 1, padding: '8px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Annulla</button>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                    <button onClick={() => salvaModifica(scarpa.id)} style={{ flex: 1, padding: '10px', backgroundColor: '#28A745', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s ease' }}>Salva</button>
+                    <button onClick={() => setIdInModifica(null)} style={{ flex: 1, padding: '10px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s ease' }}>Annulla</button>
                   </div>
                 </div>
               ) : (
                 <>
-                  {/* RIGA SUPERIORE FOTO + INFO */}
+                  {/* Vista Standard Prodotto: Immagine + Informazioni */}
                   <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', flexWrap: 'wrap', width: '100%', boxSizing: 'border-box' }}>
                     
-                    {/* Contenitore Immagine */}
+                    {/* Contenitore Immagine Sneaker */}
                     <div
                       onClick={() => isAdmin && inserisciImmagine(scarpa.id)}
                       title={isAdmin ? "Clicca per aggiungere/modificare l'immagine" : ""}
                       style={{
-                        width: '160px',
-                        height: '120px',
-                        backgroundColor: '#e9ecef',
-                        borderRadius: '5px',
+                        width: '140px',
+                        height: '110px',
+                        backgroundColor: '#f0f2f5',
+                        borderRadius: '12px',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
                         cursor: isAdmin ? 'pointer' : 'default',
                         overflow: 'hidden',
                         flexShrink: 0,
-                        border: '1px solid #dee2e6',
+                        border: '1px solid #e6e8eb',
                         position: 'relative'
                       }}
                     >
@@ -365,213 +414,205 @@ function CatalogoScarpe({
                             <button
                               onClick={(e) => rimuoviImmagine(e, scarpa.id)}
                               title="Rimuovi immagine"
-                              style={{ position: 'absolute', top: '5px', right: '5px', backgroundColor: 'rgba(220, 53, 69, 0.8)', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '12px', fontWeight: 'bold' }}
+                              style={{ position: 'absolute', top: '5px', right: '5px', backgroundColor: 'rgba(220, 53, 69, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '11px', fontWeight: 'bold', transition: 'all 0.2s ease' }}
                             >
-                              X
+                              ✕
                             </button>
                           )}
                         </>
                       ) : (
-                        isAdmin ? (
-                          <span style={{ fontSize: '30px', color: '#adb5bd', fontWeight: 'bold' }}>+</span>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#adb5bd' }}>
-                            <span style={{ fontSize: '30px' }}>👟</span>
-                            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Nessuna foto</span>
-                          </div>
-                        )
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#adb5bd', gap: '4px' }}>
+                          <span style={{ fontSize: '28px' }}>👟</span>
+                          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#666666' }}>{isAdmin ? 'Aggiungi foto' : 'Nessuna foto'}</span>
+                        </div>
                       )}
                     </div>
 
-                    {/* Contenitore Testo */}
+                    {/* Dettagli della Sneaker */}
                     <div style={{ 
                       display: 'flex', 
                       flexDirection: 'column', 
-                      flex: '1 1 170px', 
+                      flex: '1 1 160px', 
                       justifyContent: 'space-between', 
                       minWidth: 0, 
-                      minHeight: '120px',
+                      minHeight: '110px',
                       textAlign: 'left'
                     }}>
                       <div>
-                        {/* MODIFICATO: AGGIUNTO IL GENERE AFFIANCATO CON IL CARATTERE '|' */}
-                        <strong style={{ fontSize: '18px', lineHeight: '1.2', marginBottom: '5px', color: '#111111', display: 'block' }}>
-                          {scarpa.brand} | {scarpa.genere || 'Unisex'}
-                          <br />
-                          <span style={{ fontWeight: 'normal', fontSize: '16px', color: '#444444' }}>{scarpa.modello}</span>
+                        <strong style={{ fontSize: '17px', fontWeight: 'bold', lineHeight: '1.2', color: '#111111', display: 'block', marginBottom: '4px' }}>
+                          {scarpa.brand} <span style={{ fontWeight: 'normal', color: '#666666', fontSize: '14px' }}>| {scarpa.genere || 'Unisex'}</span>
                         </strong>
-                        <div style={{ color: '#333333', fontSize: '14px', display: 'flex', flexDirection: 'column', marginTop: '5px' }}>
-                          <span>Prezzo: €{scarpa.prezzo || 'N/D'}</span>
-                          <span>Colore: {scarpa.colore || 'N/D'}</span>
+                        <span style={{ fontWeight: 'normal', fontSize: '15px', color: '#666666', display: 'block', marginBottom: '6px' }}>{scarpa.modello}</span>
+                        
+                        <div style={{ color: '#111111', fontSize: '13px', display: 'flex', flexDirection: 'column', gap: '2px', fontWeight: '500' }}>
+                          <span>Prezzo: <span style={{ fontWeight: 'bold', color: '#111111' }}>€{scarpa.prezzo || 'N/D'}</span></span>
+                          <span style={{ color: '#666666' }}>Colore: {scarpa.colore || 'N/D'}</span>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                      {/* Bottoni d'Azione Prodotto */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  backgroundColor: isSalvataOvunque ? '#ffc107' : '#e9ecef',
-                  color: '#111111',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold'
-                }}
-              >
-                {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in una Raccolta ▾'}
-              </button>
-              <button
-                onClick={() => setShareMenuAperto(shareMenuAperto === scarpa.id ? null : scarpa.id)}
-                style={{
-                  flex: 1,
-                  padding: '8px',
-                  backgroundColor: '#e9ecef',
-                  color: '#111111',
-                  border: '1px solid #ccc',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: 'bold',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px'
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 3 21 3 21 9"></polyline>
-                  <polyline points="9 21 3 21 3 15"></polyline>
-                  <line x1="21" y1="3" x2="14" y2="10"></line>
-                  <line x1="3" y1="21" x2="10" y2="14"></line>
-                </svg>
-                Condividi
-              </button>
-            </div>
+                          <button
+                            onClick={() => setScarpaSelezionata(scarpaSelezionata === scarpa.id ? null : scarpa.id)}
+                            style={{
+                              flex: 12,
+                              padding: '8px 12px',
+                              backgroundColor: isSalvataOvunque ? '#ffc107' : '#f0f2f5',
+                              color: '#111111',
+                              border: 'none',
+                              borderRadius: '25px',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {isSalvataOvunque ? 'Nelle tue raccolte ▾' : 'Salva in Raccolta ▾'}
+                          </button>
+                          <button
+                            onClick={() => setShareMenuAperto(shareMenuAperto === scarpa.id ? null : scarpa.id)}
+                            style={{
+                              flex: 1,
+                              padding: '8px',
+                              backgroundColor: '#f0f2f5',
+                              color: '#111111',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '32px',
+                              height: '32px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'all 0.2s ease'
+                            }}
+                            title="Condividi in chat"
+                          >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="22" y1="2" x2="11" y2="13"></line>
+                              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                          </button>
+                        </div>
 
-            {shareMenuAperto === scarpa.id && (
-              <div style={{
-                position: 'relative',
-                width: '100%',
-                paddingTop: '10px'
-              }}>
-                <div style={{
-                  width: '100%',
-                  padding: '14px',
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #d8dce0',
-                  borderRadius: '12px',
-                  boxShadow: '0 12px 24px rgba(0,0,0,0.08)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong style={{ fontSize: '14px', color: '#111111' }}>Condividi in chat</strong>
-                    <button
-                      onClick={() => setShareMenuAperto(null)}
-                      style={{
-                        border: 'none',
-                        background: 'transparent',
-                        color: '#6c757d',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        padding: 0
-                      }}
-                    >
-                      Chiudi
-                    </button>
-                  </div>
+                        {/* Menu a comparsa per Condivisione in Chat */}
+                        {shareMenuAperto === scarpa.id && (
+                          <div style={{ position: 'relative', width: '100%', paddingTop: '5px', zIndex: 10 }}>
+                            <div style={{
+                              width: '100%',
+                              padding: '12px',
+                              backgroundColor: '#ffffff',
+                              border: '1px solid #e6e8eb',
+                              borderRadius: '12px',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '8px',
+                              boxSizing: 'border-box'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <strong style={{ fontSize: '13px', color: '#111111' }}>Invia a un amico</strong>
+                                <button
+                                  onClick={() => setShareMenuAperto(null)}
+                                  style={{ border: 'none', background: 'transparent', color: '#dc3545', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', padding: 0 }}
+                                >
+                                  Chiudi
+                                </button>
+                              </div>
 
-                  {conversazioniAttive.length === 0 ? (
-                    <p style={{ margin: 0, color: '#6c757d', fontSize: '14px' }}>Nessuna chat attiva disponibile.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
-                      {conversazioniAttive.map((conversazione) => (
-                        <button
-                          key={conversazione.id}
-                          onClick={() => condividiScarpaInChat(scarpa, conversazione)}
-                          style={{
-                            width: '100%',
-                            textAlign: 'left',
-                            padding: '10px 12px',
-                            borderRadius: '10px',
-                            border: '1px solid #e6e8eb',
-                            backgroundColor: '#f8f9fa',
-                            cursor: 'pointer',
-                            color: '#111111',
-                            fontSize: '14px'
-                          }}
-                        >
-                          @{conversazione.otherUsername}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+                              {conversazioniAttive.length === 0 ? (
+                                <p style={{ margin: 0, color: '#666666', fontSize: '13px', fontStyle: 'italic' }}>Nessuna chat attiva.</p>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                                  {conversazioniAttive.map((conversazione) => (
+                                    <button
+                                      key={conversazione.id}
+                                      onClick={() => condividiScarpaInChat(scarpa, conversazione)}
+                                      style={{
+                                        width: '100%',
+                                        textAlign: 'left',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #e6e8eb',
+                                        backgroundColor: '#f0f2f5',
+                                        cursor: 'pointer',
+                                        color: '#111111',
+                                        fontSize: '13px',
+                                        fontWeight: '500',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                    >
+                                      @{conversazione.otherUsername}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
-            {feedbackInvio[scarpa.id] && (
-              <div style={{ marginTop: '8px', fontSize: '13px', color: '#28A745' }}>{feedbackInvio[scarpa.id]}</div>
-            )}
+                        {feedbackInvio[scarpa.id] && (
+                          <div style={{ marginTop: '4px', fontSize: '13px', color: '#28A745', fontWeight: 'bold', textAlign: 'center' }}>
+                            ✓ {feedbackInvio[scarpa.id]}
+                          </div>
+                        )}
 
-            {isAdmin && (
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Modifica</button>
-                            <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>Cancella</button>
+                        {/* Tasti Modifica/Cancella esclusivi per Admin */}
+                        {isAdmin && (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            <button onClick={() => avviaModifica(scarpa)} style={{ flex: 1, padding: '6px', backgroundColor: '#007BFF', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s ease' }}>Modifica</button>
+                            <button onClick={() => eliminaScarpa(scarpa.id)} style={{ flex: 1, padding: '6px', backgroundColor: '#DC3545', color: 'white', border: 'none', borderRadius: '25px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', transition: 'all 0.2s ease' }}>Cancella</button>
                           </div>
                         )}
                       </div>
                     </div>
-
                   </div>
 
-                  {/* BOX DELLE RACCOLTE */}
+                  {/* Sotto-box Interno di Salvataggio nelle Raccolte */}
                   {scarpaSelezionata === scarpa.id && (
                     <div style={{ 
                       padding: '15px', 
                       backgroundColor: '#ffffff', 
-                      border: '1px solid #dddddd', 
-                      borderRadius: '10px', 
+                      border: '1px solid #e6e8eb', 
+                      borderRadius: '12px', 
                       display: 'flex', 
                       flexDirection: 'column', 
                       gap: '12px',
                       width: '100%',
                       boxSizing: 'border-box',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                      marginTop: '10px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+                      marginTop: '5px',
                       textAlign: 'left'
                     }}>
-                      <strong style={{ fontSize: '14px', color: '#111111', marginBottom: '2px' }}>Salva in:</strong>
+                      <strong style={{ fontSize: '13px', color: '#111111', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Seleziona Raccolta:</strong>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '160px', overflowY: 'auto' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '140px', overflowY: 'auto' }}>
                         {raccolte.map(raccolta => (
                           <label key={raccolta.id} style={{ 
-                            fontSize: '15px', 
+                            fontSize: '14px', 
                             display: 'flex', 
                             alignItems: 'center', 
                             gap: '10px', 
                             cursor: 'pointer', 
                             color: '#111111',
-                            padding: '6px 4px',
-                            borderRadius: '6px',
+                            padding: '6px 8px',
+                            borderRadius: '8px',
+                            backgroundColor: '#f0f2f5',
                             textAlign: 'left'
                           }}>
                             <input
                               type="checkbox"
                               checked={raccolta.scarpe.some(s => s.id === scarpa.id)}
                               onChange={() => toggleScarpaInRaccolta(raccolta.id, scarpa)}
-                              style={{ width: '18px', height: '18px', cursor: 'pointer', flexShrink: 0 }}
+                              style={{ width: '16px', height: '16px', cursor: 'pointer', flexShrink: 0 }}
                             />
-                            <span style={{ lineBreak: 'anywhere' }}>{raccolta.nome_raccolta}</span>
+                            <span style={{ lineBreak: 'anywhere', fontWeight: '500' }}>{raccolta.nome_raccolta}</span>
                           </label>
                         ))}
                       </div>
 
+                      {/* Input rapido per creare una nuova raccolta al volo */}
                       <div style={{ display: 'flex', gap: '8px', marginTop: '4px', width: '100%', boxSizing: 'border-box' }}>
                         <input
                           type="text"
@@ -580,28 +621,30 @@ function CatalogoScarpe({
                           onChange={(e) => setNomeNuovaRaccolta(e.target.value)}
                           style={{ 
                             flex: 1, 
-                            padding: '12px', 
-                            fontSize: '16px', 
-                            border: '1px solid #ccc', 
-                            borderRadius: '8px', 
+                            padding: '10px 14px', 
+                            fontSize: '14px', 
+                            border: '1px solid #e6e8eb', 
+                            borderRadius: '25px', 
                             minWidth: 0, 
                             color: '#111111', 
-                            backgroundColor: '#ffffff',
-                            boxSizing: 'border-box'
+                            backgroundColor: '#f0f2f5',
+                            boxSizing: 'border-box',
+                            outline: 'none'
                           }}
                         />
                         <button 
                           onClick={creaRaccolta} 
                           style={{ 
-                            padding: '12px 16px', 
-                            fontSize: '14px', 
+                            padding: '10px 18px', 
+                            fontSize: '13px', 
                             fontWeight: 'bold', 
                             backgroundColor: '#111111', 
-                            color: '#fff', 
+                            color: '#ffffff', 
                             border: 'none', 
-                            borderRadius: '8px', 
+                            borderRadius: '25px', 
                             cursor: 'pointer', 
-                            flexShrink: 0 
+                            flexShrink: 0,
+                            transition: 'all 0.2s ease'
                           }}
                         >
                           Crea
@@ -615,8 +658,11 @@ function CatalogoScarpe({
           );
         })}
       </ul>
+      
       {scarpeFiltrate.length === 0 && !inCaricamento && (
-        <p style={{ color: '#777777', textAlign: 'center', fontStyle: 'italic', marginTop: '30px' }}>Nessuna scarpa trovata.</p>
+        <p style={{ color: '#666666', textAlign: 'center', fontStyle: 'italic', marginTop: '40px', fontSize: '15px' }}>
+          Nessuna scarpa trovata nel catalogo con i filtri attuali.
+        </p>
       )}
     </div>
   );

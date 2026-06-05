@@ -850,12 +850,13 @@ function MainApp() {
     maxWidth: '900px',
     width: '100%',
     margin: '0 auto 50px auto',
-    padding: '20px',
-    borderRadius: '12px',
+    padding: '24px',
+    borderRadius: '15px',
     boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
     fontFamily: 'sans-serif',
     backgroundColor: '#ffffff',
-    color: '#111111'
+    color: '#111111',
+    transition: 'all 0.2s ease'
   };
 
   return (
@@ -886,17 +887,18 @@ function MainApp() {
         margin: '0 auto 25px auto',
         backgroundColor: '#ffffff',
         color: '#111111',
-        padding: '14px 20px',
+        padding: '16px 24px',
         borderRadius: '15px',
         boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        gap: '10px',
-        flexWrap: 'wrap'
+        gap: '12px',
+        flexWrap: 'wrap',
+        transition: 'all 0.2s ease'
       }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, color: '#111111', fontSize: '20px', fontWeight: 'bold', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
+          <h2 style={{ margin: 0, color: '#111111', fontSize: '22px', fontWeight: 'bold', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
             Sneaker Mania
           </h2>
         </div>
@@ -904,13 +906,14 @@ function MainApp() {
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexShrink: 0 }}>
           {isAdmin && (
             <span style={{
-              backgroundColor: '#ffc107',
-              color: '#111111',
-              padding: '5px 12px',
-              borderRadius: '20px',
-              fontSize: '12px',
+              backgroundColor: '#111111',
+              color: '#ffffff',
+              padding: '6px 14px',
+              borderRadius: '25px',
+              fontSize: '13px',
               fontWeight: 'bold',
-              letterSpacing: '0.5px'
+              letterSpacing: '0.5px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}>
               ADMIN
             </span>
@@ -918,19 +921,27 @@ function MainApp() {
           <button
             onClick={logout}
             style={{
-              padding: '8px 20px',
+              padding: '10px 24px',
               backgroundColor: '#dc3545',
-              color: 'white',
+              color: '#ffffff',
               border: 'none',
-              borderRadius: '25px', // Pill style coerente con il DNA
+              borderRadius: '25px', 
               cursor: 'pointer',
               fontWeight: 'bold',
               fontSize: '14px',
               transition: 'all 0.2s ease',
-              boxShadow: '0 2px 8px rgba(220, 53, 69, 0.2)'
+              boxShadow: '0 4px 10px rgba(220, 53, 69, 0.2)'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '0.85';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+            onMouseDown={(e) => e.currentTarget.style.transform = 'translateY(1px)'}
+            onMouseUp={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
           >
             Esci
           </button>

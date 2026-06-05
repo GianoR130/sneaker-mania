@@ -51,9 +51,17 @@ function Impostazioni({ utente, setVistaCorrente, containerStyle }) {
   };
 
   return (
-    // Usiamo DIRETTAMENTE containerStyle come unica scheda bianca
-    // Ho aggiunto minHeight: '60vh' per dare un po' di spazio vuoto sotto ed estendere la scheda
-    <div style={{ ...containerStyle, minHeight: '60vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ 
+      ...containerStyle, 
+      minHeight: '65vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      backgroundColor: '#ffffff',
+      borderRadius: '16px',
+      boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
+      padding: '24px',
+      border: '1px solid rgba(0,0,0,0.02)'
+    }}>
       
       {/* Header della Scheda */}
       <div style={{ 
@@ -61,53 +69,100 @@ function Impostazioni({ utente, setVistaCorrente, containerStyle }) {
         display: 'flex', 
         justifyContent: 'center', 
         alignItems: 'center',
-        borderBottom: '1px solid #eee', 
-        paddingBottom: '15px' 
+        borderBottom: '1px solid #f1f5f9', 
+        paddingBottom: '20px',
+        marginBottom: '20px'
       }}>
         
-        {/* Pulsante Indietro agganciato a sinistra */}
+        {/* Pulsante Indietro minimalista a pillola agganciato a sinistra */}
         <button
           onClick={() => setVistaCorrente('profilo')}
           style={{
             position: 'absolute',
             left: '0', 
-            padding: '8px 12px',
-            background: '#f0f2f5',
-            border: 'none',
-            borderRadius: '8px',
+            padding: '8px 16px',
+            background: '#ffffff',
+            border: '1px solid #e6e8eb',
+            borderRadius: '20px',
             cursor: 'pointer',
             color: '#111111',
-            fontWeight: 'bold',
+            fontWeight: '600',
+            fontSize: '13px',
             display: 'flex',
             alignItems: 'center',
-            gap: '5px'
+            gap: '6px',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#f8fafc';
+            e.currentTarget.style.borderColor = '#111111';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#ffffff';
+            e.currentTarget.style.borderColor = '#e6e8eb';
           }}
         >
-          ← Torna al Profilo
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+          Profilo
         </button>
         
-        <h1 style={{ margin: 0, fontSize: '20px', color: '#111111', textAlign: 'center' }}>
+        <h1 style={{ margin: 0, fontSize: '20px', color: '#111111', textAlign: 'center', fontWeight: 'bold', letterSpacing: '-0.3px' }}>
           Impostazioni Account
         </h1>
 
       </div>
 
       {/* Contenuto principale centrato all'interno della grande scheda */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', marginTop: '40px', marginBottom: '40px' }}>
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        marginTop: '40px', 
+        marginBottom: '40px',
+        textAlign: 'center'
+      }}>
         
+        <div style={{ marginBottom: '24px', maxWidth: '360px' }}>
+          <span style={{ fontSize: '32px', display: 'block', marginBottom: '12px' }}>🔒</span>
+          <h2 style={{ fontSize: '16px', color: '#111111', margin: '0 0 8px 0', fontWeight: '600' }}>Zona di Sicurezza</h2>
+          <p style={{ fontSize: '14px', color: '#666666', margin: 0, lineHeight: '1.4' }}>
+            L'eliminazione dell'account rimuoverà in modo permanente tutti i tuoi dati, post, preferiti e interazioni all'interno dell'applicazione.
+          </p>
+        </div>
+
+        {/* Pulsante Distruttivo Premium a Pillola */}
         <button
           onClick={gestisciEliminazione}
           disabled={inCaricamento}
           style={{
-            padding: '12px 30px',
-            backgroundColor: inCaricamento ? '#ccc' : '#dc3545',
-            color: 'white',
+            padding: '14px 32px',
+            backgroundColor: inCaricamento ? '#e6e8eb' : '#dc3545',
+            color: inCaricamento ? '#aaaaaa' : '#ffffff',
             border: 'none',
             borderRadius: '25px',
-            fontWeight: 'bold',
+            fontWeight: '600',
             cursor: inCaricamento ? 'not-allowed' : 'pointer',
             fontSize: '15px',
-            transition: 'all 0.2s ease'
+            transition: 'all 0.2s ease',
+            boxShadow: inCaricamento ? 'none' : '0 4px 12px rgba(220, 53, 69, 0.2)'
+          }}
+          onMouseEnter={(e) => {
+            if (!inCaricamento) {
+              e.currentTarget.style.backgroundColor = '#c82333';
+              e.currentTarget.style.transform = 'scale(1.02)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!inCaricamento) {
+              e.currentTarget.style.backgroundColor = '#dc3545';
+              e.currentTarget.style.transform = 'scale(1)';
+            }
           }}
         >
           {inCaricamento ? "Eliminazione in corso..." : "Elimina definitivamente l'account"}
